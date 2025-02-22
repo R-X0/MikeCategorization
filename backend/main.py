@@ -1,17 +1,16 @@
-# File: main.py
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from models import Transaction, Feedback
-import transaction_extraction
-import categorization
-import export
-import file_processing
-import ai_extraction  # Now uses our inline dummy OCR function
-import storage
+import base64
+import os
+import requests
+from dotenv import load_dotenv
 
-app = FastAPI(title="Automated Transaction Processing Platform")
+# Load environment variables from .env file
+load_dotenv()
 
-# Allow CORS so the React frontend can access the API.
+app = FastAPI()
+
+# Enable CORS for local development (adjust origins for production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,80 +19,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/api/upload")
-async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """
-    Endpoint to upload a file containing transaction data.
-    For PDF files, uses OCR+AI extraction; for others, uses CSV/text extraction.
-    """
-    try:
-        file_contents = await file.read()
-        if file.filename.lower().endswith(".pdf"):
-            transactions = ai_extraction.process_pdf_file(file.filename, file_contents)
-        else:
-            transactions = transaction_extraction.process_file(file.filename, file_contents)
-        
-        # Save transactions in our in-memory datastore
-        storage.add_transactions(transactions)
-        
-        # Schedule background categorization
-        background_tasks.add_task(file_processing.batch_process, transactions)
-        
-        return {"status": "Processing started", "transaction_count": len(transactions)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# Your Anthropic API key (loaded from .env)
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
 
-@app.get("/api/transactions")
-def get_transactions():
-    """
-    Retrieve processed transactions from storage.
-    """
-    return {"transactions": [tx.dict() for tx in storage.get_transactions()]}
+@app.post("/process-pdf")
+async def process_pdf(prompt: str = Form(...), file: UploadFile = File(...)):
+    # Read PDF file and convert to base64 string
+    file_content = await file.read()
+    pdf_base64 = base64.b64encode(file_content).decode("utf-8")
 
-@app.post("/api/feedback")
-def submit_feedback(feedback: Feedback):
-    """
-    Submit user feedback on transaction categorization.
-    """
-    categorization.process_feedback(feedback.transaction_id, feedback.corrected_category)
-    storage.add_feedback(feedback)
-    return {"status": "Feedback received", "feedback": feedback.dict()}
-
-@app.get("/api/export")
-def export_data(format: str = "csv"):
-    """
-    Export transactions in the requested format (csv, json, xml, or qbo).
-    """
-    transactions = storage.get_transactions()
-    try:
-        if format.lower() == "csv":
-            file_data = export.to_csv(transactions)
-        elif format.lower() == "json":
-            file_data = export.to_json(transactions)
-        elif format.lower() == "xml":
-            file_data = export.to_xml(transactions)
-        elif format.lower() == "qbo":
-            file_data = export.to_qbo(transactions)
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported export format")
-        return {"export_data": file_data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/research/{transaction_id}")
-def research_transaction(transaction_id: str):
-    """
-    Perform dummy AI research on an ambiguous transaction.
-    This endpoint now returns static research data.
-    """
-    transactions = storage.get_transactions()
-    transaction = next((tx for tx in transactions if tx.transaction_id == transaction_id), None)
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    # Dummy research result (in place of an external AI research module)
-    research_result = {
-        "confidence": "low",
-        "recommendation": "Dummy research result: please review the transaction.",
-        "additional_context": "No additional context available."
+    # Build JSON payload according to Claude PDF processing API docs
+    payload = {
+        "model": "claude-3-5-sonnet-20241022",
+        "max_tokens": 1024,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": pdf_base64
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
     }
-    return {"transaction_id": transaction_id, "research": research_result}
+
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+    }
+
+    # Send request to the Claude API
+    response = requests.post(CLAUDE_API_URL, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        api_response = response.json()
+        # Extract just the text from the response content
+        text_parts = []
+        for part in api_response.get("content", []):
+            if part.get("type") == "text":
+                text_parts.append(part.get("text", ""))
+        text_response = "\n".join(text_parts)
+        return {"response": text_response}
+    else:
+        return {
+            "error": "Request failed",
+            "status_code": response.status_code,
+            "detail": response.text
+        }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
