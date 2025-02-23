@@ -61,4 +61,5 @@ h1 {
   border: 1px solid #ddd;
   border-radius: 4px;
   background: #fafafa;
+  white-space: pre-wrap; /* Preserves formatting (line breaks, spaces, etc.) */
 }

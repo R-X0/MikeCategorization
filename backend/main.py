@@ -1,9 +1,9 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import base64
-import os
-import requests
 from dotenv import load_dotenv
+import os
+from google import genai
+from google.genai import types
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,65 +19,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Your Anthropic API key (loaded from .env)
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
+# Your Gemini API key (loaded from .env)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 @app.post("/process-pdf")
-async def process_pdf(prompt: str = Form(...), file: UploadFile = File(...)):
-    # Read PDF file and convert to base64 string
+async def process_file(prompt: str = Form(...), file: UploadFile = File(...)):
+    # Read the file content
     file_content = await file.read()
-    pdf_base64 = base64.b64encode(file_content).decode("utf-8")
-
-    # Build JSON payload according to Claude PDF processing API docs
-    payload = {
-        "model": "claude-3-5-sonnet-20241022",
-        "max_tokens": 1024,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": pdf_base64
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
-    }
-
-    headers = {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-    }
-
-    # Send request to the Claude API
-    response = requests.post(CLAUDE_API_URL, json=payload, headers=headers)
-
-    if response.status_code == 200:
-        api_response = response.json()
-        # Extract just the text from the response content
-        text_parts = []
-        for part in api_response.get("content", []):
-            if part.get("type") == "text":
-                text_parts.append(part.get("text", ""))
-        text_response = "\n".join(text_parts)
-        return {"response": text_response}
-    else:
-        return {
-            "error": "Request failed",
-            "status_code": response.status_code,
-            "detail": response.text
-        }
+    
+    # Create a media part from the file content
+    file_part = types.Part.from_bytes(
+        data=file_content,
+        mime_type=file.content_type
+    )
+    
+    # Use the inline approach to generate content
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-exp",  # Use the experimental Gemini model
+            contents=[prompt, file_part]
+        )
+        return {"response": response.text}
+    except Exception as e:
+        return {"error": "Request failed", "detail": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

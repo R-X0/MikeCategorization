@@ -10,7 +10,7 @@ const PDFProcessor = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      alert("Please select a PDF file.");
+      alert("Please select a file.");
       return;
     }
     setLoading(true);
@@ -24,7 +24,7 @@ const PDFProcessor = () => {
         body: formData,
       });
       const data = await res.json();
-      // data.response now contains just the text response from Claude
+      // data.response now contains the text response from Gemini
       setResult(data.response || "No response received.");
     } catch (error) {
       console.error("Error:", error);
@@ -37,7 +37,7 @@ const PDFProcessor = () => {
   return (
     <div className="container">
       <div className="card">
-        <h1>Claude PDF Processor</h1>
+        <h1>Gemini PDF Processor</h1>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="prompt">Prompt:</label>
@@ -52,11 +52,11 @@ const PDFProcessor = () => {
             />
           </div>
           <div className="form-group">
-            <label htmlFor="pdfFile">PDF File:</label>
+            <label htmlFor="pdfFile">File (PDF or Image):</label>
             <input
               type="file"
               id="pdfFile"
-              accept="application/pdf"
+              accept="application/pdf, image/*"
               onChange={(e) => setFile(e.target.files[0])}
               className="form-control-file"
               required
@@ -68,8 +68,8 @@ const PDFProcessor = () => {
         </form>
         {result && (
           <div className="response">
-            <h2>Response from Claude:</h2>
-            <p>{result}</p>
+            <h2>Response from Gemini:</h2>
+            <pre>{result}</pre>
           </div>
         )}
       </div>
