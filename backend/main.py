@@ -1,4 +1,5 @@
 import io
+import asyncio
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -140,6 +141,45 @@ Extracted Text:
 {extracted_text}
 """
 
+async def process_page(page):
+    # Write the individual page to a BytesIO stream.
+    pdf_writer = PdfWriter()
+    pdf_writer.add_page(page)
+    page_stream = io.BytesIO()
+    pdf_writer.write(page_stream)
+    page_stream.seek(0)
+
+    # Create a Gemini Part from the page bytes.
+    file_part = types.Part.from_bytes(
+        data=page_stream.getvalue(),
+        mime_type="application/pdf"
+    )
+
+    # Step 1: Extract raw text from the page.
+    raw_response = await asyncio.to_thread(
+        client.models.generate_content,
+        model="gemini-2.0-flash-exp",
+        contents=[RAW_PROMPT, file_part],
+        config={
+            "max_output_tokens": 40000,
+            "response_mime_type": "text/plain"
+        }
+    )
+    raw_text = raw_response.text
+
+    # Step 2: Convert the raw text into structured JSON using your schema.
+    json_prompt = JSON_SCHEMA_PROMPT_TEMPLATE.format(extracted_text=raw_text)
+    json_response = await asyncio.to_thread(
+        client.models.generate_content,
+        model="gemini-2.0-flash",
+        contents=[json_prompt],
+        config={
+            "max_output_tokens": 40000,
+            "response_mime_type": "application/json"
+        }
+    )
+    return json_response.text
+
 @app.post("/process-pdf")
 async def process_file(file: UploadFile = File(...)):
     file_content = await file.read()
@@ -148,51 +188,18 @@ async def process_file(file: UploadFile = File(...)):
     try:
         if file.content_type == "application/pdf":
             pdf_reader = PdfReader(io.BytesIO(file_content))
-            for page in pdf_reader.pages:
-                # Write the individual page to a BytesIO stream
-                pdf_writer = PdfWriter()
-                pdf_writer.add_page(page)
-                page_stream = io.BytesIO()
-                pdf_writer.write(page_stream)
-                page_stream.seek(0)
-
-                # Create a Gemini Part from the page bytes
-                file_part = types.Part.from_bytes(
-                    data=page_stream.getvalue(),
-                    mime_type="application/pdf"
-                )
-
-                # Step 1: Extract raw text from the page.
-                raw_response = client.models.generate_content(
-                    model="gemini-2.0-flash-exp",
-                    contents=[RAW_PROMPT, file_part],
-                    config={
-                        "max_output_tokens": 40000,
-                        "response_mime_type": "text/plain"
-                    }
-                )
-                raw_text = raw_response.text
-
-                # Step 2: Convert the raw text into structured JSON using your schema.
-                json_prompt = JSON_SCHEMA_PROMPT_TEMPLATE.format(extracted_text=raw_text)
-                json_response = client.models.generate_content(
-                    model="gemini-2.0-flash-exp",
-                    contents=[json_prompt],
-                    config={
-                        "max_output_tokens": 40000,
-                        "response_mime_type": "application/json"
-                    }
-                )
-
-                # Simply append the raw Gemini JSON response text.
-                combined_response_text += json_response.text + "\n\n"
+            # Create tasks for all pages concurrently.
+            tasks = [process_page(page) for page in pdf_reader.pages]
+            page_results = await asyncio.gather(*tasks)
+            combined_response_text = "\n\n".join(page_results)
         else:
-            # For non-PDF files, handle similarly.
+            # For non-PDF files, handle similarly (processing remains sequential here).
             file_part = types.Part.from_bytes(
                 data=file_content,
                 mime_type=file.content_type
             )
-            raw_response = client.models.generate_content(
+            raw_response = await asyncio.to_thread(
+                client.models.generate_content,
                 model="gemini-2.0-flash-exp",
                 contents=[RAW_PROMPT, file_part],
                 config={
@@ -202,8 +209,9 @@ async def process_file(file: UploadFile = File(...)):
             )
             raw_text = raw_response.text
             json_prompt = JSON_SCHEMA_PROMPT_TEMPLATE.format(extracted_text=raw_text)
-            json_response = client.models.generate_content(
-                model="gemini-2.0-flash-exp",
+            json_response = await asyncio.to_thread(
+                client.models.generate_content,
+                model="gemini-2.0-flash",
                 contents=[json_prompt],
                 config={
                     "max_output_tokens": 40000,
