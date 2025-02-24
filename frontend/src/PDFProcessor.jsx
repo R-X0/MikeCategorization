@@ -4,7 +4,7 @@ import "./App.css";
 const PDFProcessor = () => {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
-  const [textUrl, setTextUrl] = useState("");
+  const [downloadUrl, setDownloadUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -15,7 +15,8 @@ const PDFProcessor = () => {
     }
     setLoading(true);
     setMessage("");
-    setTextUrl("");
+    setDownloadUrl("");
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -25,11 +26,13 @@ const PDFProcessor = () => {
         body: formData,
       });
       const data = await res.json();
-      console.log("Text response:", data.response);
-      // Use the returned text string directly.
-      const blob = new Blob([data.response], { type: "text/plain" });
+      console.log("Response:", data.response);
+      
+      // Use the response as plain text.
+      const text = data.response;
+      const blob = new Blob([text], { type: "text/plain" });
       const url = window.URL.createObjectURL(blob);
-      setTextUrl(url);
+      setDownloadUrl(url);
       setMessage("Finished processing");
     } catch (error) {
       console.error("Processing error:", error);
@@ -64,9 +67,9 @@ const PDFProcessor = () => {
             <h2>{message}</h2>
           </div>
         )}
-        {textUrl && (
+        {downloadUrl && (
           <div className="download">
-            <a href={textUrl} download="document_data.txt" className="btn">
+            <a href={downloadUrl} download="document_data.txt" className="btn">
               Download Text Document
             </a>
           </div>
