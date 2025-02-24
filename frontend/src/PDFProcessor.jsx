@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import "./App.css";
 
 const PDFProcessor = () => {
-  const [prompt, setPrompt] = useState("");
   const [file, setFile] = useState(null);
-  const [result, setResult] = useState("");
+  const [message, setMessage] = useState("");
+  const [textUrl, setTextUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -14,8 +14,9 @@ const PDFProcessor = () => {
       return;
     }
     setLoading(true);
+    setMessage("");
+    setTextUrl("");
     const formData = new FormData();
-    formData.append("prompt", prompt);
     formData.append("file", file);
 
     try {
@@ -24,11 +25,15 @@ const PDFProcessor = () => {
         body: formData,
       });
       const data = await res.json();
-      // data.response now contains the text response from Gemini
-      setResult(data.response || "No response received.");
+      console.log("Text response:", data.response);
+      // Use the returned text string directly.
+      const blob = new Blob([data.response], { type: "text/plain" });
+      const url = window.URL.createObjectURL(blob);
+      setTextUrl(url);
+      setMessage("Finished processing");
     } catch (error) {
-      console.error("Error:", error);
-      setResult("An error occurred.");
+      console.error("Processing error:", error);
+      setMessage("An error occurred: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -39,18 +44,6 @@ const PDFProcessor = () => {
       <div className="card">
         <h1>Gemini PDF Processor</h1>
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="prompt">Prompt:</label>
-            <input
-              type="text"
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Enter your question..."
-              className="form-control"
-              required
-            />
-          </div>
           <div className="form-group">
             <label htmlFor="pdfFile">File (PDF or Image):</label>
             <input
@@ -66,10 +59,16 @@ const PDFProcessor = () => {
             {loading ? "Processing..." : "Submit"}
           </button>
         </form>
-        {result && (
+        {message && (
           <div className="response">
-            <h2>Response from Gemini:</h2>
-            <pre>{result}</pre>
+            <h2>{message}</h2>
+          </div>
+        )}
+        {textUrl && (
+          <div className="download">
+            <a href={textUrl} download="document_data.txt" className="btn">
+              Download Text Document
+            </a>
           </div>
         )}
       </div>
