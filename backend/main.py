@@ -1,5 +1,6 @@
 import io
 import asyncio
+import json
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -180,20 +181,51 @@ async def process_page(page):
     )
     return json_response.text
 
+def merge_page_results(page_results):
+    """
+    Merge JSON results from multiple pages.
+    For document-level fields, we assume they are the same across pages and only keep the first occurrence.
+    For list fields (e.g., lineItems), we concatenate them.
+    """
+    merged = None
+    for result in page_results:
+        try:
+            data = json.loads(result)
+        except json.JSONDecodeError:
+            continue  # Optionally log or handle the error
+        if merged is None:
+            merged = data
+        else:
+            # Merge lineItems arrays if they exist
+            if "lineItems" in data and isinstance(data["lineItems"], list):
+                merged.setdefault("lineItems", []).extend(data["lineItems"])
+            
+            # Merge additionalData arrays (attachments, referenceNumbers, auditTrail)
+            if "additionalData" in data:
+                for key in ["attachments", "referenceNumbers", "auditTrail"]:
+                    if key in data["additionalData"]:
+                        merged.setdefault("additionalData", {}).setdefault(key, []).extend(
+                            data["additionalData"][key]
+                        )
+            # (Optionally add more merging logic for other repeated fields.)
+    return merged
+
 @app.post("/process-pdf")
 async def process_file(file: UploadFile = File(...)):
     file_content = await file.read()
-    combined_response_text = ""
     
     try:
         if file.content_type == "application/pdf":
             pdf_reader = PdfReader(io.BytesIO(file_content))
-            # Create tasks for all pages concurrently.
+            # Process each page concurrently using the per-page processing function.
             tasks = [process_page(page) for page in pdf_reader.pages]
             page_results = await asyncio.gather(*tasks)
-            combined_response_text = "\n\n".join(page_results)
+            
+            # Merge the JSON results from each page.
+            merged_result = merge_page_results(page_results)
+            combined_response_text = json.dumps(merged_result, indent=2)
         else:
-            # For non-PDF files, handle similarly (processing remains sequential here).
+            # For non-PDF files, process as before.
             file_part = types.Part.from_bytes(
                 data=file_content,
                 mime_type=file.content_type
@@ -218,9 +250,9 @@ async def process_file(file: UploadFile = File(...)):
                     "response_mime_type": "application/json"
                 }
             )
-            combined_response_text += json_response.text
+            combined_response_text = json_response.text
 
-        # Return the combined Gemini responses as plain text.
+        # Return the merged Gemini response.
         return {"response": combined_response_text.strip()}
     except Exception as e:
         return {"error": "Request failed", "detail": str(e)}
