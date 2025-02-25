@@ -1,4 +1,3 @@
-// Create this file as frontend/src/VendorResearch.jsx
 import React, { useState } from "react";
 import "./App.css";
 
@@ -33,7 +32,12 @@ const VendorResearch = ({ vendorName, jsonData }) => {
         setError(data.error);
       } else {
         setVendorInfo(data.vendorInfo);
-        setSearchSuggestionsHtml(data.searchSuggestionsHtml);
+        // Only set search suggestions if they exist
+        if (data.searchSuggestionsHtml) {
+          setSearchSuggestionsHtml(data.searchSuggestionsHtml);
+        } else {
+          setSearchSuggestionsHtml("");
+        }
       }
     } catch (err) {
       setError(`Failed to research vendor: ${err.message}`);
@@ -47,11 +51,23 @@ const VendorResearch = ({ vendorName, jsonData }) => {
     if (!searchSuggestionsHtml) return null;
     
     return (
-      <div 
-        className="search-suggestions-container"
-        dangerouslySetInnerHTML={{ __html: searchSuggestionsHtml }}
-      />
+      <div className="vendor-info-wrapper">
+        <h4>Additional Information</h4>
+        <div 
+          className="search-suggestions-container"
+          dangerouslySetInnerHTML={{ 
+            __html: sanitizeHtml(searchSuggestionsHtml) 
+          }}
+        />
+      </div>
     );
+  };
+
+  // Updated function to sanitize incoming HTML by removing script and style tags
+  const sanitizeHtml = (html) => {
+    return html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
   };
 
   return (
