@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./App.css";
+import VendorResearch from "./VendorResearch";
 
 const PDFProcessor = () => {
   const [file, setFile] = useState(null);
@@ -10,6 +11,8 @@ const PDFProcessor = () => {
   const [dragActive, setDragActive] = useState(false);
   const [bankDragActive, setBankDragActive] = useState(false);
   const [overlayActive, setOverlayActive] = useState(false);
+  const [parsedData, setParsedData] = useState(null);
+  const [vendorName, setVendorName] = useState("");
   const fileInputRef = useRef(null);
   const bankFileInputRef = useRef(null);
   const dropContainerRef = useRef(null);
@@ -202,6 +205,8 @@ const PDFProcessor = () => {
     setLoading(true);
     setMessage("");
     setDownloadUrl("");
+    setParsedData(null);
+    setVendorName("");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -218,6 +223,21 @@ const PDFProcessor = () => {
       
       const data = await res.json();
       console.log("Response:", data.response);
+      
+      // Parse the JSON response
+      try {
+        const jsonData = JSON.parse(data.response);
+        setParsedData(jsonData);
+        
+        // Extract vendor name if available
+        if (jsonData && jsonData.partyInformation && jsonData.partyInformation.vendor) {
+          setVendorName(jsonData.partyInformation.vendor.name || "");
+        } else if (jsonData && jsonData.documentMetadata && jsonData.documentMetadata.source) {
+          setVendorName(jsonData.documentMetadata.source.name || "");
+        }
+      } catch (parseError) {
+        console.error("Error parsing JSON:", parseError);
+      }
       
       // Use the response as plain text
       const text = data.response;
@@ -447,6 +467,14 @@ const PDFProcessor = () => {
             </form>
           </div>
         </div>
+        
+        {/* Vendor Research section */}
+        {parsedData && vendorName && (
+          <VendorResearch 
+            vendorName={vendorName}
+            jsonData={parsedData}
+          />
+        )}
       </div>
 
       <footer className="footer">

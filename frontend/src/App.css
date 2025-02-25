@@ -671,3 +671,66 @@ h1 {
     width: 100%;
   }
 }
+
+/* Add these styles to your App.css file */
+
+.vendor-research {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: var(--white);
+  border-radius: var(--rounded-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.vendor-details {
+  margin: 1rem 0;
+  padding: 1rem;
+  background-color: var(--light-gray);
+  border-radius: var(--rounded-md);
+}
+
+.vendor-details p {
+  margin-bottom: 0.5rem;
+}
+
+.vendor-details p:last-child {
+  margin-bottom: 0;
+}
+
+.research-btn {
+  background-color: #7c3aed;
+  margin: 1rem 0;
+}
+
+.research-btn:hover {
+  background-color: #6d28d9;
+}
+
+.vendor-info {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f0f9ff;
+  border-radius: var(--rounded-md);
+  border-left: 3px solid #3b82f6;
+}
+
+.vendor-info h4 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  color: var(--dark-gray);
+}
+
+.search-suggestions-container {
+  margin-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.error-message {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border-radius: var(--rounded-md);
+  border-left: 3px solid var(--danger);
+}

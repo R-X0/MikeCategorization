@@ -1,8 +1,9 @@
 import io
 import asyncio
 import json
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Body
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 from google import genai
@@ -256,6 +257,64 @@ async def process_file(file: UploadFile = File(...)):
         return {"response": combined_response_text.strip()}
     except Exception as e:
         return {"error": "Request failed", "detail": str(e)}
+
+# Define request model for vendor research
+class VendorResearchRequest(BaseModel):
+    vendor_name: str
+
+@app.post("/research-vendor")
+async def research_vendor(request: VendorResearchRequest):
+    vendor_name = request.vendor_name
+    
+    if not vendor_name:
+        return {"error": "No vendor name provided"}
+    
+    try:
+        # Create the prompt asking about the vendor
+        prompt = f"What is {vendor_name}? Provide information about this company or business."
+        
+        # Use Google Search as a tool for grounding
+        google_search_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
+        
+        # Send the request to Gemini API with search enabled
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[google_search_tool],
+                response_modalities=["TEXT"],
+            )
+        )
+        
+        # Extract the main content
+        content = response.text
+        
+        # Extract the search suggestion information (rendered HTML content)
+        search_suggestions_html = None
+        if hasattr(response, 'candidates') and response.candidates:
+            if hasattr(response.candidates[0], 'grounding_metadata') and response.candidates[0].grounding_metadata:
+                if hasattr(response.candidates[0].grounding_metadata, 'search_entry_point'):
+                    search_suggestions_html = response.candidates[0].grounding_metadata.search_entry_point.rendered_content
+        
+        # Extract web search queries if available
+        web_search_queries = []
+        if hasattr(response, 'candidates') and response.candidates:
+            if hasattr(response.candidates[0], 'grounding_metadata') and response.candidates[0].grounding_metadata:
+                if hasattr(response.candidates[0].grounding_metadata, 'web_search_queries'):
+                    web_search_queries = response.candidates[0].grounding_metadata.web_search_queries
+        
+        return {
+            "vendorInfo": content,
+            "searchSuggestionsHtml": search_suggestions_html,
+            "webSearchQueries": web_search_queries
+        }
+    
+    except Exception as e:
+        print(f"Error researching vendor: {str(e)}")
+        return {"error": f"Error researching vendor: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
