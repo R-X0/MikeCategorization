@@ -270,64 +270,22 @@ async def research_vendor(request: VendorResearchRequest):
         return {"error": "No vendor name provided"}
     
     try:
-        # Create a detailed prompt asking about the vendor and requesting categorization
+        # Create a specific prompt asking for the single most likely entity and detailed info about it
         prompt = f"""
-        Research the vendor "{vendor_name}" and provide information in JSON format with these components:
+        Research the vendor "{vendor_name}" and identify the SINGLE most likely business or entity that this name refers to. 
         
-        1. vendorInfo: Brief description of what this vendor/company does
-        2. financialCategorization: Categorize this vendor for accounting purposes with:
-           - mostLikelyAnswer: The single most appropriate category
-           - description: Brief explanation of why this categorization is appropriate
-           - category: The parent category from the taxonomy
-           - subcategory: The specific subcategory from the taxonomy  
-           - ledgerEntryType: The appropriate ledger entry type
+        IMPORTANT: DO NOT list multiple possible interpretations or multiple businesses.
+        Determine the most probable, prominent, or common business that matches this name and ONLY provide information about that ONE business.
         
-        Use only these categories from the accounting taxonomy:
+        For this single most likely business, provide as much detail as possible about:
+        - What this company does (main business focus)
+        - Their products or services in detail
+        - Company size, scale of operations, and market position
+        - Company history and important milestones
+        - Locations, reach, or distribution
+        - Any other relevant details that would be helpful to know
         
-        Parent Category | Subcategory | Ledger Entry Type
-        ----------------|-------------|------------------
-        Revenue | Product Sales | Revenue
-        Revenue | Service Revenue | Revenue
-        Revenue | Rental Revenue | Revenue
-        Revenue | Commission Revenue | Revenue
-        Revenue | Subscription Revenue | Revenue
-        Revenue | Other Income | Revenue
-        Cost of Goods Sold (COGS) | Raw Materials | Expense (COGS)
-        Cost of Goods Sold (COGS) | Direct Labor | Expense (COGS)
-        Cost of Goods Sold (COGS) | Manufacturing Overhead | Expense (COGS)
-        Cost of Goods Sold (COGS) | Freight and Delivery | Expense (COGS)
-        Operating Expenses | Salaries and Wages | Expense (Operating)
-        Operating Expenses | Rent Expense | Expense (Operating)
-        Operating Expenses | Utilities Expense | Expense (Operating)
-        Operating Expenses | Office Supplies | Expense (Operating)
-        Operating Expenses | Business Software / IT Expenses | Expense (Operating)
-        Operating Expenses | HR Expenses | Expense (Operating)
-        Operating Expenses | Marketing and Advertising | Expense (Operating)
-        Operating Expenses | Travel and Entertainment | Expense (Operating)
-        Operating Expenses | Insurance Expense | Expense (Operating)
-        Operating Expenses | Repairs and Maintenance | Expense (Operating)
-        Operating Expenses | Depreciation Expense | Expense (Operating)
-        Administrative Expenses | Professional Fees | Expense (Administrative)
-        Administrative Expenses | Office Expenses | Expense (Administrative)
-        Administrative Expenses | Postage and Shipping | Expense (Administrative)
-        Administrative Expenses | Communication Expense | Expense (Administrative)
-        Administrative Expenses | Bank Fees and Charges | Expense (Administrative)
-        Financial Expenses | Interest Expense | Expense (Financial)
-        Financial Expenses | Loan Fees | Expense (Financial)
-        Financial Expenses | Credit Card Fees | Expense (Financial)
-        Other Expenses | Miscellaneous Expense | Expense (Other)
-        Other Expenses | Donations/Charitable Contributions | Expense (Other)
-        Other Expenses | Loss on Disposal of Assets | Expense (Other)
-        
-        IMPORTANT FORMATTING REQUIREMENTS:
-        - Return ONLY the raw JSON object with no markdown formatting
-        - Do NOT use triple backticks (```) around the JSON
-        - Do NOT include the word 'json' or any other labels
-        - The response must be directly parseable by JSON.parse()
-        - Don't include any explanations, notes, or other text before or after the JSON
-        
-        Example of correct format:
-        {{"vendorInfo": "Description here", "financialCategorization": {{"mostLikelyAnswer": "Category", "description": "Explanation", "category": "Parent", "subcategory": "Sub", "ledgerEntryType": "Type"}}}}
+        Again, I want information about the single most likely match only, not a list of possibilities.
         """
         
         # Use Google Search as a tool for grounding
@@ -343,10 +301,11 @@ async def research_vendor(request: VendorResearchRequest):
             config=types.GenerateContentConfig(
                 tools=[google_search_tool],
                 response_modalities=["TEXT"],
+                temperature=0.2, # Lower temperature to make response more focused
             )
         )
         
-        # Return the response wrapped in a proper JSON object
+        # Return the response as-is
         return {"response": response.text}
         
     except Exception as e:

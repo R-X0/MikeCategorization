@@ -5,29 +5,13 @@ const VendorResearch = ({ vendorName, jsonData }) => {
   const [vendorInfo, setVendorInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [financialCategorization, setFinancialCategorization] = useState(null);
-  const [debugInfo, setDebugInfo] = useState("");
-
-  // Helper function to extract JSON from markdown code blocks
-  const extractJsonFromMarkdown = (text) => {
-    // Check if the text contains markdown code blocks with JSON
-    const jsonCodeBlockRegex = /```(?:json)?\s*([\s\S]*?)```/;
-    const match = text.match(jsonCodeBlockRegex);
-    
-    if (match && match[1]) {
-      return match[1].trim();
-    }
-    
-    return text;
-  };
 
   const researchVendor = async () => {
     if (!vendorName) return;
     
     setLoading(true);
     setError("");
-    setFinancialCategorization(null);
-    setDebugInfo("");
+    setVendorInfo("");
     
     try {
       console.log("Sending request to research vendor:", vendorName);
@@ -46,7 +30,6 @@ const VendorResearch = ({ vendorName, jsonData }) => {
         throw new Error(`HTTP error ${response.status}`);
       }
       
-      // Get the response data
       const data = await response.json();
       console.log("Response data:", data);
       
@@ -57,43 +40,54 @@ const VendorResearch = ({ vendorName, jsonData }) => {
       
       if (!data.response) {
         setError("Invalid response from server");
-        setDebugInfo(JSON.stringify(data, null, 2));
         return;
       }
       
-      // Extract JSON if it's wrapped in markdown code blocks
-      const cleanedJsonText = extractJsonFromMarkdown(data.response);
-      console.log("Cleaned JSON text:", cleanedJsonText);
+      // Simply use the text response directly
+      setVendorInfo(data.response);
       
-      // Now try to parse the cleaned text as JSON
-      try {
-        const parsedData = JSON.parse(cleanedJsonText);
-        console.log("Parsed vendor data:", parsedData);
-        
-        // Set vendor information
-        setVendorInfo(parsedData.vendorInfo || "");
-        
-        // Set financial categorization if available
-        if (parsedData.financialCategorization) {
-          setFinancialCategorization(parsedData.financialCategorization);
-        } else {
-          console.warn("No financial categorization in response");
-        }
-      } catch (parseError) {
-        console.error("Error parsing JSON from Gemini:", parseError);
-        setError("Failed to parse vendor information. The response was not valid JSON.");
-        setDebugInfo(data.response);
-        
-        // Attempt to display in a more readable format
-        setVendorInfo("Could not extract structured information for this vendor.");
-      }
     } catch (err) {
       console.error("Error in vendor research:", err);
       setError(`Failed to research vendor: ${err.message}`);
-      setDebugInfo(err.toString());
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to convert plain text with line breaks to formatted HTML
+  const formatTextWithBreaks = (text) => {
+    // If the text is empty, return nothing
+    if (!text) return null;
+    
+    // Split text by line breaks and create paragraphs
+    const paragraphs = text.split(/\n\n+/);
+    
+    return (
+      <>
+        {paragraphs.map((paragraph, index) => {
+          // Check if this paragraph looks like a heading (short and ends with a colon)
+          const isHeading = paragraph.length < 50 && paragraph.trim().endsWith(':');
+          
+          if (isHeading) {
+            return <h4 key={index}>{paragraph}</h4>;
+          }
+          
+          // For regular paragraphs, handle internal line breaks
+          const lines = paragraph.split(/\n/);
+          
+          return (
+            <p key={index}>
+              {lines.map((line, lineIndex) => (
+                <React.Fragment key={lineIndex}>
+                  {line}
+                  {lineIndex < lines.length - 1 && <br />}
+                </React.Fragment>
+              ))}
+            </p>
+          );
+        })}
+      </>
+    );
   };
 
   return (
@@ -153,44 +147,14 @@ const VendorResearch = ({ vendorName, jsonData }) => {
       {error && (
         <div className="error-message">
           {error}
-          {debugInfo && (
-            <div className="debug-info">
-              <details>
-                <summary>Debug Information</summary>
-                <pre>{debugInfo}</pre>
-              </details>
-            </div>
-          )}
         </div>
       )}
       
       {vendorInfo && (
-        <div className="vendor-info">
-          <h4>About this Vendor</h4>
-          <p>{vendorInfo}</p>
-          
-          {/* Financial Categorization Section */}
-          {financialCategorization && (
-            <div className="financial-categorization">
-              <h4>Financial Categorization</h4>
-              <div className="categorization-card">
-                <div className="categorization-header">
-                  <span 
-                    className="category-tag"
-                    data-type={financialCategorization.ledgerEntryType.split(' ')[0]}
-                  >
-                    {financialCategorization.ledgerEntryType}
-                  </span>
-                  <span className="category-name">{financialCategorization.mostLikelyAnswer}</span>
-                </div>
-                <div className="categorization-details">
-                  <p><strong>Category:</strong> {financialCategorization.category}</p>
-                  <p><strong>Subcategory:</strong> {financialCategorization.subcategory}</p>
-                  <p><strong>Description:</strong> {financialCategorization.description}</p>
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="vendor-info-wrapper">
+          <div className="vendor-info">
+            {formatTextWithBreaks(vendorInfo)}
+          </div>
         </div>
       )}
     </div>
