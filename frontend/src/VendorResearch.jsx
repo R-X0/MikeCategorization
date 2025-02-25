@@ -3,17 +3,35 @@ import "./App.css";
 
 const VendorResearch = ({ vendorName, jsonData }) => {
   const [vendorInfo, setVendorInfo] = useState("");
-  const [searchSuggestionsHtml, setSearchSuggestionsHtml] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [financialCategorization, setFinancialCategorization] = useState(null);
+  const [debugInfo, setDebugInfo] = useState("");
+
+  // Helper function to extract JSON from markdown code blocks
+  const extractJsonFromMarkdown = (text) => {
+    // Check if the text contains markdown code blocks with JSON
+    const jsonCodeBlockRegex = /```(?:json)?\s*([\s\S]*?)```/;
+    const match = text.match(jsonCodeBlockRegex);
+    
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    
+    return text;
+  };
 
   const researchVendor = async () => {
     if (!vendorName) return;
     
     setLoading(true);
     setError("");
+    setFinancialCategorization(null);
+    setDebugInfo("");
     
     try {
+      console.log("Sending request to research vendor:", vendorName);
+      
       const response = await fetch("http://localhost:8000/research-vendor", {
         method: "POST",
         headers: {
@@ -22,52 +40,60 @@ const VendorResearch = ({ vendorName, jsonData }) => {
         body: JSON.stringify({ vendor_name: vendorName }),
       });
       
+      console.log("Received response:", response);
+      
       if (!response.ok) {
         throw new Error(`HTTP error ${response.status}`);
       }
       
+      // Get the response data
       const data = await response.json();
+      console.log("Response data:", data);
       
       if (data.error) {
         setError(data.error);
-      } else {
-        setVendorInfo(data.vendorInfo);
-        // Only set search suggestions if they exist
-        if (data.searchSuggestionsHtml) {
-          setSearchSuggestionsHtml(data.searchSuggestionsHtml);
+        return;
+      }
+      
+      if (!data.response) {
+        setError("Invalid response from server");
+        setDebugInfo(JSON.stringify(data, null, 2));
+        return;
+      }
+      
+      // Extract JSON if it's wrapped in markdown code blocks
+      const cleanedJsonText = extractJsonFromMarkdown(data.response);
+      console.log("Cleaned JSON text:", cleanedJsonText);
+      
+      // Now try to parse the cleaned text as JSON
+      try {
+        const parsedData = JSON.parse(cleanedJsonText);
+        console.log("Parsed vendor data:", parsedData);
+        
+        // Set vendor information
+        setVendorInfo(parsedData.vendorInfo || "");
+        
+        // Set financial categorization if available
+        if (parsedData.financialCategorization) {
+          setFinancialCategorization(parsedData.financialCategorization);
         } else {
-          setSearchSuggestionsHtml("");
+          console.warn("No financial categorization in response");
         }
+      } catch (parseError) {
+        console.error("Error parsing JSON from Gemini:", parseError);
+        setError("Failed to parse vendor information. The response was not valid JSON.");
+        setDebugInfo(data.response);
+        
+        // Attempt to display in a more readable format
+        setVendorInfo("Could not extract structured information for this vendor.");
       }
     } catch (err) {
+      console.error("Error in vendor research:", err);
       setError(`Failed to research vendor: ${err.message}`);
+      setDebugInfo(err.toString());
     } finally {
       setLoading(false);
     }
-  };
-
-  // Function to safely render HTML provided by the API (search suggestions)
-  const renderSearchSuggestions = () => {
-    if (!searchSuggestionsHtml) return null;
-    
-    return (
-      <div className="vendor-info-wrapper">
-        <h4>Additional Information</h4>
-        <div 
-          className="search-suggestions-container"
-          dangerouslySetInnerHTML={{ 
-            __html: sanitizeHtml(searchSuggestionsHtml) 
-          }}
-        />
-      </div>
-    );
-  };
-
-  // Updated function to sanitize incoming HTML by removing script and style tags
-  const sanitizeHtml = (html) => {
-    return html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
   };
 
   return (
@@ -127,6 +153,14 @@ const VendorResearch = ({ vendorName, jsonData }) => {
       {error && (
         <div className="error-message">
           {error}
+          {debugInfo && (
+            <div className="debug-info">
+              <details>
+                <summary>Debug Information</summary>
+                <pre>{debugInfo}</pre>
+              </details>
+            </div>
+          )}
         </div>
       )}
       
@@ -135,8 +169,28 @@ const VendorResearch = ({ vendorName, jsonData }) => {
           <h4>About this Vendor</h4>
           <p>{vendorInfo}</p>
           
-          {/* Render Google Search Suggestions */}
-          {renderSearchSuggestions()}
+          {/* Financial Categorization Section */}
+          {financialCategorization && (
+            <div className="financial-categorization">
+              <h4>Financial Categorization</h4>
+              <div className="categorization-card">
+                <div className="categorization-header">
+                  <span 
+                    className="category-tag"
+                    data-type={financialCategorization.ledgerEntryType.split(' ')[0]}
+                  >
+                    {financialCategorization.ledgerEntryType}
+                  </span>
+                  <span className="category-name">{financialCategorization.mostLikelyAnswer}</span>
+                </div>
+                <div className="categorization-details">
+                  <p><strong>Category:</strong> {financialCategorization.category}</p>
+                  <p><strong>Subcategory:</strong> {financialCategorization.subcategory}</p>
+                  <p><strong>Description:</strong> {financialCategorization.description}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -270,8 +270,65 @@ async def research_vendor(request: VendorResearchRequest):
         return {"error": "No vendor name provided"}
     
     try:
-        # Create the prompt asking about the vendor
-        prompt = f"What is {vendor_name}? Provide information about this company or business."
+        # Create a detailed prompt asking about the vendor and requesting categorization
+        prompt = f"""
+        Research the vendor "{vendor_name}" and provide information in JSON format with these components:
+        
+        1. vendorInfo: Brief description of what this vendor/company does
+        2. financialCategorization: Categorize this vendor for accounting purposes with:
+           - mostLikelyAnswer: The single most appropriate category
+           - description: Brief explanation of why this categorization is appropriate
+           - category: The parent category from the taxonomy
+           - subcategory: The specific subcategory from the taxonomy  
+           - ledgerEntryType: The appropriate ledger entry type
+        
+        Use only these categories from the accounting taxonomy:
+        
+        Parent Category | Subcategory | Ledger Entry Type
+        ----------------|-------------|------------------
+        Revenue | Product Sales | Revenue
+        Revenue | Service Revenue | Revenue
+        Revenue | Rental Revenue | Revenue
+        Revenue | Commission Revenue | Revenue
+        Revenue | Subscription Revenue | Revenue
+        Revenue | Other Income | Revenue
+        Cost of Goods Sold (COGS) | Raw Materials | Expense (COGS)
+        Cost of Goods Sold (COGS) | Direct Labor | Expense (COGS)
+        Cost of Goods Sold (COGS) | Manufacturing Overhead | Expense (COGS)
+        Cost of Goods Sold (COGS) | Freight and Delivery | Expense (COGS)
+        Operating Expenses | Salaries and Wages | Expense (Operating)
+        Operating Expenses | Rent Expense | Expense (Operating)
+        Operating Expenses | Utilities Expense | Expense (Operating)
+        Operating Expenses | Office Supplies | Expense (Operating)
+        Operating Expenses | Business Software / IT Expenses | Expense (Operating)
+        Operating Expenses | HR Expenses | Expense (Operating)
+        Operating Expenses | Marketing and Advertising | Expense (Operating)
+        Operating Expenses | Travel and Entertainment | Expense (Operating)
+        Operating Expenses | Insurance Expense | Expense (Operating)
+        Operating Expenses | Repairs and Maintenance | Expense (Operating)
+        Operating Expenses | Depreciation Expense | Expense (Operating)
+        Administrative Expenses | Professional Fees | Expense (Administrative)
+        Administrative Expenses | Office Expenses | Expense (Administrative)
+        Administrative Expenses | Postage and Shipping | Expense (Administrative)
+        Administrative Expenses | Communication Expense | Expense (Administrative)
+        Administrative Expenses | Bank Fees and Charges | Expense (Administrative)
+        Financial Expenses | Interest Expense | Expense (Financial)
+        Financial Expenses | Loan Fees | Expense (Financial)
+        Financial Expenses | Credit Card Fees | Expense (Financial)
+        Other Expenses | Miscellaneous Expense | Expense (Other)
+        Other Expenses | Donations/Charitable Contributions | Expense (Other)
+        Other Expenses | Loss on Disposal of Assets | Expense (Other)
+        
+        IMPORTANT FORMATTING REQUIREMENTS:
+        - Return ONLY the raw JSON object with no markdown formatting
+        - Do NOT use triple backticks (```) around the JSON
+        - Do NOT include the word 'json' or any other labels
+        - The response must be directly parseable by JSON.parse()
+        - Don't include any explanations, notes, or other text before or after the JSON
+        
+        Example of correct format:
+        {{"vendorInfo": "Description here", "financialCategorization": {{"mostLikelyAnswer": "Category", "description": "Explanation", "category": "Parent", "subcategory": "Sub", "ledgerEntryType": "Type"}}}}
+        """
         
         # Use Google Search as a tool for grounding
         google_search_tool = types.Tool(
@@ -289,29 +346,9 @@ async def research_vendor(request: VendorResearchRequest):
             )
         )
         
-        # Extract the main content
-        content = response.text
+        # Return the response wrapped in a proper JSON object
+        return {"response": response.text}
         
-        # Extract the search suggestion information (rendered HTML content)
-        search_suggestions_html = None
-        if hasattr(response, 'candidates') and response.candidates:
-            if hasattr(response.candidates[0], 'grounding_metadata') and response.candidates[0].grounding_metadata:
-                if hasattr(response.candidates[0].grounding_metadata, 'search_entry_point'):
-                    search_suggestions_html = response.candidates[0].grounding_metadata.search_entry_point.rendered_content
-        
-        # Extract web search queries if available
-        web_search_queries = []
-        if hasattr(response, 'candidates') and response.candidates:
-            if hasattr(response.candidates[0], 'grounding_metadata') and response.candidates[0].grounding_metadata:
-                if hasattr(response.candidates[0].grounding_metadata, 'web_search_queries'):
-                    web_search_queries = response.candidates[0].grounding_metadata.web_search_queries
-        
-        return {
-            "vendorInfo": content,
-            "searchSuggestionsHtml": search_suggestions_html,
-            "webSearchQueries": web_search_queries
-        }
-    
     except Exception as e:
         print(f"Error researching vendor: {str(e)}")
         return {"error": f"Error researching vendor: {str(e)}"}

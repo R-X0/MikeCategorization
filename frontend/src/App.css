@@ -788,3 +788,117 @@ h1 {
   position: relative;
   contain: content;
 }
+
+/* Financial Categorization Styles */
+.financial-categorization {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.categorization-card {
+  background-color: #f0f9ff;
+  border-radius: var(--rounded-md);
+  border-left: 3px solid #4f46e5;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-top: 0.75rem;
+}
+
+.categorization-header {
+  padding: 1rem;
+  background-color: rgba(79, 70, 229, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.category-tag {
+  background-color: #4f46e5;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.category-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--dark-gray);
+}
+
+.categorization-details {
+  padding: 1rem;
+}
+
+.categorization-details p {
+  margin-bottom: 0.5rem;
+}
+
+.categorization-details p:last-child {
+  margin-bottom: 0;
+}
+
+/* Color variations based on ledger type */
+.category-tag[data-type="Revenue"] {
+  background-color: #10b981; /* green */
+}
+
+.category-tag[data-type^="Expense"] {
+  background-color: #ef4444; /* red */
+}
+
+.category-tag[data-type^="Asset"] {
+  background-color: #3b82f6; /* blue */
+}
+
+.category-tag[data-type^="Liability"] {
+  background-color: #f59e0b; /* amber */
+}
+
+.category-tag[data-type="Equity"] {
+  background-color: #8b5cf6; /* purple */
+}
+
+.category-tag[data-type="Adjustment"] {
+  background-color: #6b7280; /* gray */
+}
+
+/* Add these debug styles to the end of your existing App.css file */
+
+.debug-info {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.debug-info details {
+  background-color: #f8fafc;
+  border-radius: var(--rounded-sm);
+  overflow: hidden;
+}
+
+.debug-info summary {
+  padding: 0.5rem;
+  cursor: pointer;
+  background-color: #f1f5f9;
+  font-weight: 500;
+  user-select: none;
+}
+
+.debug-info summary:hover {
+  background-color: #e2e8f0;
+}
+
+.debug-info pre {
+  padding: 0.75rem;
+  background-color: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 0 0 var(--rounded-sm) var(--rounded-sm);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  max-height: 300px;
+  overflow-y: auto;
+}
