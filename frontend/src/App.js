@@ -1,9 +1,11 @@
+// App.js
 import React from "react";
 import PDFProcessor from "./PDFProcessor";
+import "./App.css";
 
 function App() {
   return (
-    <div>
+    <div className="App">
       <PDFProcessor />
     </div>
   );
