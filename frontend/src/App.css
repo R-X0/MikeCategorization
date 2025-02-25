@@ -617,3 +617,57 @@ h1 {
     padding: 1.5rem 1rem;
   }
 }
+
+/* Add these styles to your App.css file */
+
+.two-column-layout {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.two-column-layout .card {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.two-column-layout .card h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: var(--dark-gray);
+}
+
+.bank-btn {
+  background-color: #10b981;
+}
+
+.bank-btn:hover {
+  background-color: #059669;
+}
+
+.coming-soon-badge {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.35rem 0.75rem;
+  background-color: #fef3c7;
+  color: #d97706;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 900px) {
+  .two-column-layout {
+    flex-direction: column;
+  }
+  
+  .two-column-layout .card {
+    width: 100%;
+  }
+}
