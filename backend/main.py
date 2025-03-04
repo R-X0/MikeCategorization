@@ -312,6 +312,148 @@ async def research_vendor(request: VendorResearchRequest):
         print(f"Error researching vendor: {str(e)}")
         return {"error": f"Error researching vendor: {str(e)}"}
 
+# Define request model for financial categorization
+class FinancialCategorizationRequest(BaseModel):
+    vendor_info: str
+    document_data: dict
+    transaction_purpose: str = ""  # Renamed to clarify it's about the transaction, not the vendor
+
+@app.post("/categorize-transaction")
+async def categorize_transaction(request: FinancialCategorizationRequest):
+    vendor_info = request.vendor_info
+    document_data = request.document_data
+    transaction_purpose = request.transaction_purpose
+    
+    if not vendor_info or not document_data:
+        return {"error": "Missing required information"}
+    
+    try:
+        # Create a prompt that includes the categorization options and asks Gemini to categorize the transaction
+        prompt = f"""
+        Based on the information below, please categorize this transaction according to accounting principles.
+        
+        CRITICAL INSTRUCTION: You must categorize from the perspective of the INVOICE RECIPIENT (the customer being billed), NOT from the vendor's perspective. 
+        
+        For example:
+        - If this is an invoice FROM a vendor TO our business, it should typically be categorized as an Expense, Asset, or Liability
+        - If this is a receipt we issued TO a customer FROM our business, it would be categorized as Revenue
+        
+        This categorization is for the accounting records of the business RECEIVING the invoice/document.
+        
+        Return a JSON object with the following structure:
+        {{
+            "companyName": "The name of the company that issued the invoice (the vendor)",
+            "description": "A detailed description of what this business does",
+            "category": "The most appropriate accounting category from the list below",
+            "subcategory": "The most appropriate subcategory",
+            "ledgerType": "The ledger entry type",
+            "explanation": "A detailed explanation of why this categorization was chosen, including the factors considered and accounting principles applied"
+        }}
+        
+        Here are the available categories, subcategories, and ledger types:
+        
+        Parent Category | Subcategory | Ledger Entry Type
+        ---------------|-------------|------------------
+        Revenue | Product Sales | Revenue
+        Revenue | Service Revenue | Revenue
+        Revenue | Rental Revenue | Revenue
+        Revenue | Commission Revenue | Revenue
+        Revenue | Subscription Revenue | Revenue
+        Revenue | Other Income | Revenue
+        Cost of Goods Sold (COGS) | Raw Materials | Expense (COGS)
+        Cost of Goods Sold (COGS) | Direct Labor | Expense (COGS)
+        Cost of Goods Sold (COGS) | Manufacturing Overhead | Expense (COGS)
+        Cost of Goods Sold (COGS) | Freight and Delivery | Expense (COGS)
+        Operating Expenses | Salaries and Wages | Expense (Operating)
+        Operating Expenses | Rent | Expense (Operating)
+        Operating Expenses | Utilities | Expense (Operating)
+        Operating Expenses | Office Supplies | Expense (Operating)
+        Operating Expenses | Business Software / IT Expenses | Expense (Operating)
+        Operating Expenses | HR Expenses | Expense (Operating)
+        Operating Expenses | Marketing and Advertising | Expense (Operating)
+        Operating Expenses | Travel and Entertainment | Expense (Operating)
+        Operating Expenses | Insurance | Expense (Operating)
+        Operating Expenses | Repairs and Maintenance | Expense (Operating)
+        Operating Expenses | Depreciation | Expense (Operating)
+        Administrative Expenses | Professional Fees | Expense (Administrative)
+        Administrative Expenses | Office Expenses | Expense (Administrative)
+        Administrative Expenses | Postage and Shipping | Expense (Administrative)
+        Administrative Expenses | Communication Expense | Expense (Administrative)
+        Administrative Expenses | Bank Fees and Charges | Expense (Administrative)
+        Financial Expenses | Interest Expense | Expense (Financial)
+        Financial Expenses | Loan Fees | Expense (Financial)
+        Financial Expenses | Credit Card Fees | Expense (Financial)
+        Other Expenses | Miscellaneous | Expense (Other)
+        Other Expenses | Donations/Charitable Contributions | Expense (Other)
+        Other Expenses | Loss on Disposal of Assets | Expense (Other)
+        Assets – Current | Cash and Cash Equivalents | Asset (Current)
+        Assets – Current | Accounts Receivable | Asset (Current)
+        Assets – Current | Inventory | Asset (Current)
+        Assets – Current | Prepaid Expenses | Asset (Current)
+        Assets – Current | Short-term Investments | Asset (Current)
+        Assets – Fixed / Long-term | Property, Plant, and Equipment | Asset (Fixed)
+        Assets – Fixed / Long-term | Furniture and Fixtures | Asset (Fixed)
+        Assets – Fixed / Long-term | Vehicles | Asset (Fixed)
+        Assets – Fixed / Long-term | Machinery and Equipment | Asset (Fixed)
+        Assets – Fixed / Long-term | Computer Equipment | Asset (Fixed)
+        Assets – Intangible | Patents | Asset (Intangible)
+        Assets – Intangible | Trademarks | Asset (Intangible)
+        Assets – Intangible | Copyrights | Asset (Intangible)
+        Assets – Intangible | Goodwill | Asset (Intangible)
+        Assets – Intangible | Capitalized Software | Asset (Intangible)
+        Liabilities – Current | Accounts Payable | Liability (Current)
+        Liabilities – Current | Short-term Loans | Liability (Current)
+        Liabilities – Current | Accrued Liabilities | Liability (Current)
+        Liabilities – Current | Current Portion of Long-term Debt | Liability (Current)
+        Liabilities – Long-term | Long-term Loans | Liability (Long-term)
+        Liabilities – Long-term | Bonds Payable | Liability (Long-term)
+        Liabilities – Long-term | Deferred Tax Liabilities | Liability (Long-term)
+        Equity | Common Stock | Equity
+        Equity | Retained Earnings | Equity
+        Equity | Additional Paid-in Capital | Equity
+        Equity | Dividends/Distributions | Equity
+        Adjusting / Journal Entries | Accruals/Deferrals/Depreciation Adjustments | Adjustment
+        
+        Vendor Information (the seller/company that sent the invoice):
+        {vendor_info}
+        
+        Document Data:
+        {json.dumps(document_data, indent=2)}
+        
+        Transaction Purpose (what the invoice is for):
+        {transaction_purpose}
+        
+        REMEMBER: Categorize from the perspective of the business RECEIVING this invoice - the customer being billed, NOT from the perspective of the vendor who issued it.
+        
+        In the explanation field, be thorough about why this specific category, subcategory, and ledger type was chosen. 
+        Consider the nature of the transaction, the items or services involved, accounting best practices, and how this 
+        classification aligns with standard chart of accounts structures.
+        """
+        
+        # Send the request to Gemini API
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config={
+                "max_output_tokens": 4000,
+                "response_mime_type": "application/json"
+            }
+        )
+        
+        # Return the response
+        try:
+            # Try to parse the response as JSON
+            categorization_json = json.loads(response.text)
+            return {"response": categorization_json}
+        except json.JSONDecodeError:
+            # If it's not valid JSON, return the raw text
+            return {"response": response.text}
+            
+    except Exception as e:
+        print(f"Error categorizing transaction: {str(e)}")
+        return {"error": f"Error categorizing transaction: {str(e)}"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
