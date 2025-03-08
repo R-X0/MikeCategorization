@@ -903,12 +903,58 @@ h1 {
   overflow-y: auto;
 }
 
-/* Math Verification Styles - Updated */
+/* Math Verification Styles - Updated with document type support */
 
-.math-verification {
+.math-verification, .extraction-verification {
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid #e5e7eb;
+}
+
+.verification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.help-button {
+  font-size: 0.875rem;
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--rounded-md);
+  cursor: pointer;
+  color: #4b5563;
+  transition: all 0.2s ease;
+}
+
+.help-button:hover {
+  background-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.calculation-help {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--rounded-md);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.calculation-help p {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.calculation-help ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.calculation-help li {
+  margin-bottom: 0.25rem;
 }
 
 .verification-status {
@@ -973,7 +1019,7 @@ h1 {
   margin: 0;
 }
 
-.high-significance-badge {
+.high-significance-badge, .high-confidence-badge {
   display: inline-block;
   background-color: #fee2e2;
   color: #b91c1c;
@@ -1023,7 +1069,7 @@ h1 {
   border-bottom: none;
 }
 
-.discrepancies-table .numeric {
+.discrepancies-table .numeric, .discrepancies-table .value-cell {
   text-align: right;
   font-family: monospace;
 }
@@ -1041,33 +1087,33 @@ h1 {
 }
 
 /* Significance styling */
-tr.significance-High {
+tr.significance-High, tr.confidence-High {
   background-color: #fef2f2;
 }
 
-tr.significance-Medium {
+tr.significance-Medium, tr.confidence-Medium {
   background-color: #fff7ed;
 }
 
-tr.significance-Low {
+tr.significance-Low, tr.confidence-Low {
   background-color: transparent;
 }
 
-.significance-cell {
+.significance-cell, .confidence-cell {
   font-weight: 600;
   font-size: 0.75rem;
   text-transform: uppercase;
 }
 
-.significance-cell.High {
+.significance-cell.High, .confidence-cell.High {
   color: #b91c1c;
 }
 
-.significance-cell.Medium {
+.significance-cell.Medium, .confidence-cell.Medium {
   color: #c2410c;
 }
 
-.significance-cell.Low {
+.significance-cell.Low, .confidence-cell.Low {
   color: #6b7280;
 }
 

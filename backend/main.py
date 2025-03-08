@@ -143,60 +143,141 @@ Extracted Text:
 {extracted_text}
 """
 
-async def verify_calculations(json_data):
+def detect_document_type(json_data):
     """
-    Verify the mathematical consistency of the extracted financial data.
-    Uses Gemini to check calculations like subtotal + tax = total, and line item calculations.
+    Detect the document type from the JSON data to apply appropriate verification rules.
     
     Parameters:
     json_data (dict): The structured JSON data extracted from the document
     
     Returns:
-    dict: Original JSON with added math verification results
+    str: Document type - 'invoice', 'receipt', 'payment_processing', 'bank_statement', or 'other'
+    """
+    # Get the document type from metadata if available
+    doc_type = json_data.get("documentMetadata", {}).get("documentType", "").lower()
+    
+    # Check for specific document type indicators
+    if doc_type in ["merchantstatement", "merchant_statement", "payment_processing_statement", 
+                    "processor_statement", "acquirer_statement"]:
+        return "payment_processing"
+    
+    # Check for bank statement indicators
+    if doc_type in ["bankstatement", "bank_statement", "account_statement"]:
+        return "bank_statement"
+    
+    # Check for invoice indicators
+    if doc_type in ["invoice", "bill"]:
+        return "invoice"
+    
+    # Check for receipt indicators
+    if doc_type in ["receipt", "sales_receipt"]:
+        return "receipt"
+    
+    # If no explicit type, analyze the content to determine type
+    
+    # Check for payment processing statement indicators
+    if any(keyword in str(json_data).lower() for keyword in 
+           ["interchange", "merchant id", "card summary", "chargebacks", 
+            "settlement", "processor", "acquirer", "mastercard", "visa fees"]):
+        return "payment_processing"
+    
+    # Check for card transaction indicators (high volume of transactions)
+    line_items = json_data.get("lineItems", [])
+    if len(line_items) > 20 and any("card" in str(item).lower() for item in line_items):
+        return "payment_processing"
+    
+    # Check for special fields that indicate payment processing
+    if "credits" in str(json_data).lower() and "sales" in str(json_data).lower() and "settlement" in str(json_data).lower():
+        return "payment_processing"
+    
+    # Check for indicators of a bank statement
+    if any(keyword in str(json_data).lower() for keyword in 
+           ["account number", "routing number", "beginning balance", "ending balance", 
+            "deposits", "withdrawals", "account summary"]):
+        return "bank_statement"
+    
+    # Check for invoice indicators (if not already detected)
+    if "invoice" in str(json_data).lower() or "bill to" in str(json_data).lower():
+        return "invoice"
+    
+    # Default to invoice verification rules if we can't determine
+    return "invoice"
+
+async def verify_extraction(json_data):
+    """
+    Verify the extraction accuracy by comparing row and column sums with their totals
+    in the document itself, rather than applying financial formulas that may not apply.
+    
+    Parameters:
+    json_data (dict): The structured JSON data extracted from the document
+    
+    Returns:
+    dict: Original JSON with added extraction verification results
     """
     try:
-        # Create a prompt for Gemini to verify calculations
+        # First, detect document type to apply appropriate verification rules
+        document_type = detect_document_type(json_data)
+        
+        # Create a prompt for Gemini that focuses on extraction accuracy
         verification_prompt = f"""
-        Analyze this financial document data and perform mathematical verification on all calculations.
+        Analyze this financial document data to verify EXTRACTION ACCURACY, not mathematical correctness.
+        
+        DOCUMENT TYPE: {document_type.upper()}
         
         CRITICAL INSTRUCTIONS:
-        1. Analyze the document as a WHOLE, not page by page. This is a multi-page document where values may carry over.
-        2. Verify if subtotal + tax - discount = total amount where these values are provided at the document level.
-        3. Verify each line item calculation (quantity * unit price = line total) only where ALL required values are present.
-        4. If values are missing (like unit price, quantity, etc.), do NOT flag it as a discrepancy - this is normal for some financial documents.
-        5. Check if the sum of all line item totals = subtotal where appropriate.
-        6. For payment processing statements and merchant statements, focus on the main totals rather than individual fees.
-
+        1. DO NOT verify financial formulas (like subtotal + tax = total) unless explicitly stated in the document.
+        2. Instead, focus on verifying that values were correctly extracted from the document:
+           - Verify column sums match their stated totals in the document
+           - Verify row calculations match their stated results in the document
+           - Identify likely OCR/extraction errors (e.g., "0" extracted as "O", "1" as "l", etc.)
+        
+        3. Apply different verification approaches based on document type:
+        
+           FOR PAYMENT PROCESSING STATEMENTS OR MERCHANT STATEMENTS:
+           - Verify that column sums match the extracted totals shown in the document itself
+           - DO NOT assume that totals should equal the sum of line items unless explicitly stated
+           - Simply check if the extraction matches what's actually in the document
+        
+           FOR INVOICES AND RECEIPTS:
+           - Verify that extracted line items match their stated totals in the document
+           - Check that document's own calculated values were correctly extracted
+        
+           FOR BANK STATEMENTS:
+           - Verify that transaction amounts were correctly extracted
+           - Check that running balances match what's shown in the document
+        
+        4. When reviewing numerical values:
+           - Check for common extraction errors with decimal points (e.g., 1.00 vs 100)
+           - Check for common digit extraction errors (e.g., 7 vs 1, 8 vs 3, 5 vs 6)
+           - Verify that signs (positive/negative) were correctly captured
+        
         IMPORTANT GUIDELINES:
-        - Normal rounding differences (up to 0.03 or 0.05 for percentage calculations) are acceptable and should NOT be flagged.
-        - Only flag clear mathematical errors where the difference exceeds normal rounding.
-        - Focus on the most significant discrepancies (over $1.00) to avoid noise from tiny calculation differences.
-        - Merchant statements often contain aggregated values that may not directly add up from visible line items - this is normal.
-        - If you see values that seem to be missing data needed for calculation (missing subtotals, missing tax amounts), do NOT flag these.
-        - For payment processing statements, recognize that many line items are fees that don't follow simple quantity * price calculations.
+        - Your primary goal is to verify EXTRACTION ACCURACY, not financial correctness
+        - The document itself might contain mathematical errors - that's not what you're checking
+        - You're checking if the JSON data accurately represents what's actually in the document
+        - Focus on clear extraction errors where digits or decimal points were misread
         
         Financial Data:
         {json.dumps(json_data, indent=2)}
         
         Return your verification as JSON with this strict structure:
         {{
-          "mathVerified": Boolean (true if all major calculations check out or only have normal rounding differences, false only for significant issues),
+          "extractionVerified": Boolean (true if extraction is accurate, false if clear extraction errors exist),
           "discrepancies": [
             {{
-              "type": "String (LineItem, Subtotal, Total, etc.)",
+              "type": "String (LineItem, Column Total, Row Sum, etc.)",
               "location": "String (reference to where in the document this occurs)",
-              "expected": "Number (the calculated expected value)",
-              "actual": "Number (the actual value in the document)",
-              "correction": "Number (the correct value to use)",
-              "significance": "String (High, Medium, Low)"
+              "documentValue": "String/Number (what appears to be in the document)",
+              "extractedValue": "String/Number (what was extracted in the JSON)",
+              "likelyCorrectValue": "String/Number (the most likely correct value)",
+              "confidence": "String (High, Medium, Low)"
             }}
           ],
-          "summary": "String (brief explanation of verification results focusing only on significant issues)"
+          "summary": "String (brief explanation of extraction verification results)"
         }}
         
-        Only include discrepancies where there is a clear mathematical error that exceeds normal rounding differences.
-        Rate the significance of each discrepancy based on the dollar amount difference and impact on totals.
-        For the summary, provide a concise explanation focusing only on significant issues that would materially impact financial understanding.
+        Only include discrepancies that appear to be EXTRACTION ERRORS, not mathematical inconsistencies in the document itself.
+        Rate the confidence of each discrepancy based on the clarity of the extraction error.
         """
         
         # Make the API call to Gemini
@@ -214,19 +295,19 @@ async def verify_calculations(json_data):
         try:
             verification_results = json.loads(verification_response.text)
             
-            # Filter out low significance discrepancies if there are too many
+            # Filter out low confidence discrepancies if there are too many
             if "discrepancies" in verification_results and len(verification_results["discrepancies"]) > 10:
-                # Keep only high and medium significance issues
+                # Keep only high and medium confidence issues
                 significant_issues = [d for d in verification_results["discrepancies"] 
-                                     if d.get("significance", "Low") in ["High", "Medium"]]
+                                     if d.get("confidence", "Low") in ["High", "Medium"]]
                 
-                # If we still have more than 5 discrepancies, prioritize high significance only
+                # If we still have more than 5 discrepancies, prioritize high confidence only
                 if len(significant_issues) > 5:
-                    high_significance_issues = [d for d in significant_issues 
-                                              if d.get("significance", "") == "High"]
-                    # If we have high significance issues, use only those
-                    if high_significance_issues:
-                        verification_results["discrepancies"] = high_significance_issues
+                    high_confidence_issues = [d for d in significant_issues 
+                                              if d.get("confidence", "") == "High"]
+                    # If we have high confidence issues, use only those
+                    if high_confidence_issues:
+                        verification_results["discrepancies"] = high_confidence_issues
                     else:
                         # Otherwise use the top 5 medium issues
                         verification_results["discrepancies"] = significant_issues[:5]
@@ -234,12 +315,12 @@ async def verify_calculations(json_data):
                     verification_results["discrepancies"] = significant_issues
             
             # Add verification results to the original JSON
-            json_data["mathVerification"] = verification_results
+            json_data["extractionVerification"] = verification_results
             
         except json.JSONDecodeError as e:
             # If the response isn't valid JSON, create a simple error structure
-            json_data["mathVerification"] = {
-                "mathVerified": False,
+            json_data["extractionVerification"] = {
+                "extractionVerified": False,
                 "discrepancies": [],
                 "summary": f"Error parsing verification results: {str(e)}",
                 "rawResponse": verification_response.text
@@ -249,10 +330,10 @@ async def verify_calculations(json_data):
         
     except Exception as e:
         # If verification fails, add error information to the JSON
-        json_data["mathVerification"] = {
-            "mathVerified": False,
+        json_data["extractionVerification"] = {
+            "extractionVerified": False,
             "discrepancies": [],
-            "summary": f"Error during math verification: {str(e)}"
+            "summary": f"Error during extraction verification: {str(e)}"
         }
         return json_data
 
@@ -294,25 +375,14 @@ async def process_page(page):
         }
     )
     
-    # Parse the JSON response
-    try:
-        json_data = json.loads(json_response.text)
-        
-        # Step 3: Verify mathematical calculations
-        verified_json = await verify_calculations(json_data)
-        
-        # Return the verified JSON as a string
-        return json.dumps(verified_json, indent=2)
-    except json.JSONDecodeError:
-        # If parsing fails, return the original response
-        return json_response.text
+    # Return the JSON response to be merged later
+    return json_response.text
 
 def merge_page_results(page_results):
     """
     Merge JSON results from multiple pages.
     For document-level fields, we assume they are the same across pages and only keep the first occurrence.
     For list fields (e.g., lineItems), we concatenate them.
-    For math verification, perform a new verification on the merged document rather than combining individual page results.
     """
     merged = None
     
@@ -338,17 +408,12 @@ def merge_page_results(page_results):
                             data["additionalData"][key]
                         )
     
-    # For a multi-page document, re-run the verification on the complete merged document
-    # Instead of combining individual page verification results
-    if merged:
-        # We deliberately don't include any mathVerification fields from individual pages
-        # as we'll perform a new verification on the complete document
-        if "mathVerification" in merged:
-            del merged["mathVerification"]
+    # Remove any extractionVerification fields - we'll perform a new verification on the complete document
+    if merged and "extractionVerification" in merged:
+        del merged["extractionVerification"]
             
     return merged
 
-# Modify the process_file function to perform math verification after merging pages
 @app.post("/process-pdf")
 async def process_file(file: UploadFile = File(...)):
     file_content = await file.read()
@@ -363,9 +428,10 @@ async def process_file(file: UploadFile = File(...)):
             # Merge the JSON results from each page.
             merged_result = merge_page_results(page_results)
             
-            # After merging all pages, perform a single math verification on the complete document
-            verified_result = await verify_calculations(merged_result)
-            combined_response_text = json.dumps(verified_result, indent=2)
+            # Perform extraction verification on the complete document
+            final_result = await verify_extraction(merged_result)
+            
+            combined_response_text = json.dumps(final_result, indent=2)
         else:
             # For non-PDF files, process as before.
             file_part = types.Part.from_bytes(
@@ -393,11 +459,11 @@ async def process_file(file: UploadFile = File(...)):
                 }
             )
             
-            # For non-PDF files (single page), add math verification
+            # For non-PDF files (single page), add extraction verification
             try:
                 json_data = json.loads(json_response.text)
-                verified_json = await verify_calculations(json_data)
-                combined_response_text = json.dumps(verified_json, indent=2)
+                final_json = await verify_extraction(json_data)
+                combined_response_text = json.dumps(final_json, indent=2)
             except json.JSONDecodeError:
                 combined_response_text = json_response.text
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./App.css";
 import VendorResearch from "./VendorResearch";
-import MathVerification from "./MathVerification";
+import ExtractionVerification from "./ExtractionVerification";
 
 const PDFProcessor = () => {
   const [file, setFile] = useState(null);
@@ -14,6 +14,7 @@ const PDFProcessor = () => {
   const [overlayActive, setOverlayActive] = useState(false);
   const [parsedData, setParsedData] = useState(null);
   const [vendorName, setVendorName] = useState("");
+  const [documentType, setDocumentType] = useState("Unknown");
   const fileInputRef = useRef(null);
   const bankFileInputRef = useRef(null);
   const dropContainerRef = useRef(null);
@@ -208,6 +209,7 @@ const PDFProcessor = () => {
     setDownloadUrl("");
     setParsedData(null);
     setVendorName("");
+    setDocumentType("Unknown");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -237,12 +239,26 @@ const PDFProcessor = () => {
           setVendorName(jsonData.documentMetadata.source.name || "");
         }
         
-        // If math verification found issues, update the message
-        if (jsonData.mathVerification && !jsonData.mathVerification.mathVerified) {
-          setMessage("Document processed. Some calculation discrepancies were found.");
+        // Extract document type
+        const docType = jsonData.documentMetadata && jsonData.documentMetadata.documentType 
+          ? jsonData.documentMetadata.documentType 
+          : "Unknown";
+        setDocumentType(docType);
+        
+        // Set message based on verification results
+        let statusMessage = `Document processed (${docType})`;
+        
+        // Check extraction verification results
+        const extractionIssues = jsonData.extractionVerification && !jsonData.extractionVerification.extractionVerified;
+        
+        if (extractionIssues) {
+          statusMessage += ". Possible data extraction issues detected.";
         } else {
-          setMessage("Document processed successfully!");
+          statusMessage += ". Processing successful!";
         }
+        
+        setMessage(statusMessage);
+        
       } catch (parseError) {
         console.error("Error parsing JSON:", parseError);
       }
@@ -409,9 +425,12 @@ const PDFProcessor = () => {
                   </a>
                 )}
                 
-                {/* Add Math Verification component if we have parsed data */}
-                {parsedData && parsedData.mathVerification && (
-                  <MathVerification verificationData={parsedData.mathVerification} />
+                {/* Add Extraction Verification component if we have parsed data */}
+                {parsedData && parsedData.extractionVerification && (
+                  <ExtractionVerification 
+                    verificationData={parsedData.extractionVerification}
+                    documentType={documentType}
+                  />
                 )}
               </div>
             )}
