@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./App.css";
 import VendorResearch from "./VendorResearch";
+import MathVerification from "./MathVerification";
 
 const PDFProcessor = () => {
   const [file, setFile] = useState(null);
@@ -235,6 +236,13 @@ const PDFProcessor = () => {
         } else if (jsonData && jsonData.documentMetadata && jsonData.documentMetadata.source) {
           setVendorName(jsonData.documentMetadata.source.name || "");
         }
+        
+        // If math verification found issues, update the message
+        if (jsonData.mathVerification && !jsonData.mathVerification.mathVerified) {
+          setMessage("Document processed. Some calculation discrepancies were found.");
+        } else {
+          setMessage("Document processed successfully!");
+        }
       } catch (parseError) {
         console.error("Error parsing JSON:", parseError);
       }
@@ -244,7 +252,7 @@ const PDFProcessor = () => {
       const blob = new Blob([text], { type: "application/json" });
       const url = window.URL.createObjectURL(blob);
       setDownloadUrl(url);
-      setMessage("Document processed successfully!");
+      
     } catch (error) {
       console.error("Processing error:", error);
       setMessage("An error occurred: " + error.message);
@@ -377,6 +385,7 @@ const PDFProcessor = () => {
               </button>
             </form>
 
+            {/* Result container section after successful processing */}
             {(message || downloadUrl) && (
               <div className="result-container">
                 {message && (
@@ -398,6 +407,11 @@ const PDFProcessor = () => {
                     </svg>
                     Download Structured Data
                   </a>
+                )}
+                
+                {/* Add Math Verification component if we have parsed data */}
+                {parsedData && parsedData.mathVerification && (
+                  <MathVerification verificationData={parsedData.mathVerification} />
                 )}
               </div>
             )}

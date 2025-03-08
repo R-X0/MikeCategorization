@@ -143,6 +143,119 @@ Extracted Text:
 {extracted_text}
 """
 
+async def verify_calculations(json_data):
+    """
+    Verify the mathematical consistency of the extracted financial data.
+    Uses Gemini to check calculations like subtotal + tax = total, and line item calculations.
+    
+    Parameters:
+    json_data (dict): The structured JSON data extracted from the document
+    
+    Returns:
+    dict: Original JSON with added math verification results
+    """
+    try:
+        # Create a prompt for Gemini to verify calculations
+        verification_prompt = f"""
+        Analyze this financial document data and perform mathematical verification on all calculations.
+        
+        CRITICAL INSTRUCTIONS:
+        1. Analyze the document as a WHOLE, not page by page. This is a multi-page document where values may carry over.
+        2. Verify if subtotal + tax - discount = total amount where these values are provided at the document level.
+        3. Verify each line item calculation (quantity * unit price = line total) only where ALL required values are present.
+        4. If values are missing (like unit price, quantity, etc.), do NOT flag it as a discrepancy - this is normal for some financial documents.
+        5. Check if the sum of all line item totals = subtotal where appropriate.
+        6. For payment processing statements and merchant statements, focus on the main totals rather than individual fees.
+
+        IMPORTANT GUIDELINES:
+        - Normal rounding differences (up to 0.03 or 0.05 for percentage calculations) are acceptable and should NOT be flagged.
+        - Only flag clear mathematical errors where the difference exceeds normal rounding.
+        - Focus on the most significant discrepancies (over $1.00) to avoid noise from tiny calculation differences.
+        - Merchant statements often contain aggregated values that may not directly add up from visible line items - this is normal.
+        - If you see values that seem to be missing data needed for calculation (missing subtotals, missing tax amounts), do NOT flag these.
+        - For payment processing statements, recognize that many line items are fees that don't follow simple quantity * price calculations.
+        
+        Financial Data:
+        {json.dumps(json_data, indent=2)}
+        
+        Return your verification as JSON with this strict structure:
+        {{
+          "mathVerified": Boolean (true if all major calculations check out or only have normal rounding differences, false only for significant issues),
+          "discrepancies": [
+            {{
+              "type": "String (LineItem, Subtotal, Total, etc.)",
+              "location": "String (reference to where in the document this occurs)",
+              "expected": "Number (the calculated expected value)",
+              "actual": "Number (the actual value in the document)",
+              "correction": "Number (the correct value to use)",
+              "significance": "String (High, Medium, Low)"
+            }}
+          ],
+          "summary": "String (brief explanation of verification results focusing only on significant issues)"
+        }}
+        
+        Only include discrepancies where there is a clear mathematical error that exceeds normal rounding differences.
+        Rate the significance of each discrepancy based on the dollar amount difference and impact on totals.
+        For the summary, provide a concise explanation focusing only on significant issues that would materially impact financial understanding.
+        """
+        
+        # Make the API call to Gemini
+        verification_response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.0-flash",
+            contents=[verification_prompt],
+            config={
+                "max_output_tokens": 4000,
+                "response_mime_type": "application/json"
+            }
+        )
+        
+        # Extract verification results
+        try:
+            verification_results = json.loads(verification_response.text)
+            
+            # Filter out low significance discrepancies if there are too many
+            if "discrepancies" in verification_results and len(verification_results["discrepancies"]) > 10:
+                # Keep only high and medium significance issues
+                significant_issues = [d for d in verification_results["discrepancies"] 
+                                     if d.get("significance", "Low") in ["High", "Medium"]]
+                
+                # If we still have more than 5 discrepancies, prioritize high significance only
+                if len(significant_issues) > 5:
+                    high_significance_issues = [d for d in significant_issues 
+                                              if d.get("significance", "") == "High"]
+                    # If we have high significance issues, use only those
+                    if high_significance_issues:
+                        verification_results["discrepancies"] = high_significance_issues
+                    else:
+                        # Otherwise use the top 5 medium issues
+                        verification_results["discrepancies"] = significant_issues[:5]
+                else:
+                    verification_results["discrepancies"] = significant_issues
+            
+            # Add verification results to the original JSON
+            json_data["mathVerification"] = verification_results
+            
+        except json.JSONDecodeError as e:
+            # If the response isn't valid JSON, create a simple error structure
+            json_data["mathVerification"] = {
+                "mathVerified": False,
+                "discrepancies": [],
+                "summary": f"Error parsing verification results: {str(e)}",
+                "rawResponse": verification_response.text
+            }
+        
+        return json_data
+        
+    except Exception as e:
+        # If verification fails, add error information to the JSON
+        json_data["mathVerification"] = {
+            "mathVerified": False,
+            "discrepancies": [],
+            "summary": f"Error during math verification: {str(e)}"
+        }
+        return json_data
+
 async def process_page(page):
     # Write the individual page to a BytesIO stream.
     pdf_writer = PdfWriter()
@@ -180,20 +293,36 @@ async def process_page(page):
             "response_mime_type": "application/json"
         }
     )
-    return json_response.text
+    
+    # Parse the JSON response
+    try:
+        json_data = json.loads(json_response.text)
+        
+        # Step 3: Verify mathematical calculations
+        verified_json = await verify_calculations(json_data)
+        
+        # Return the verified JSON as a string
+        return json.dumps(verified_json, indent=2)
+    except json.JSONDecodeError:
+        # If parsing fails, return the original response
+        return json_response.text
 
 def merge_page_results(page_results):
     """
     Merge JSON results from multiple pages.
     For document-level fields, we assume they are the same across pages and only keep the first occurrence.
     For list fields (e.g., lineItems), we concatenate them.
+    For math verification, perform a new verification on the merged document rather than combining individual page results.
     """
     merged = None
+    
+    # First, merge all the basic document data
     for result in page_results:
         try:
             data = json.loads(result)
         except json.JSONDecodeError:
             continue  # Optionally log or handle the error
+            
         if merged is None:
             merged = data
         else:
@@ -208,9 +337,18 @@ def merge_page_results(page_results):
                         merged.setdefault("additionalData", {}).setdefault(key, []).extend(
                             data["additionalData"][key]
                         )
-            # (Optionally add more merging logic for other repeated fields.)
+    
+    # For a multi-page document, re-run the verification on the complete merged document
+    # Instead of combining individual page verification results
+    if merged:
+        # We deliberately don't include any mathVerification fields from individual pages
+        # as we'll perform a new verification on the complete document
+        if "mathVerification" in merged:
+            del merged["mathVerification"]
+            
     return merged
 
+# Modify the process_file function to perform math verification after merging pages
 @app.post("/process-pdf")
 async def process_file(file: UploadFile = File(...)):
     file_content = await file.read()
@@ -224,7 +362,10 @@ async def process_file(file: UploadFile = File(...)):
             
             # Merge the JSON results from each page.
             merged_result = merge_page_results(page_results)
-            combined_response_text = json.dumps(merged_result, indent=2)
+            
+            # After merging all pages, perform a single math verification on the complete document
+            verified_result = await verify_calculations(merged_result)
+            combined_response_text = json.dumps(verified_result, indent=2)
         else:
             # For non-PDF files, process as before.
             file_part = types.Part.from_bytes(
@@ -251,7 +392,14 @@ async def process_file(file: UploadFile = File(...)):
                     "response_mime_type": "application/json"
                 }
             )
-            combined_response_text = json_response.text
+            
+            # For non-PDF files (single page), add math verification
+            try:
+                json_data = json.loads(json_response.text)
+                verified_json = await verify_calculations(json_data)
+                combined_response_text = json.dumps(verified_json, indent=2)
+            except json.JSONDecodeError:
+                combined_response_text = json_response.text
 
         # Return the merged Gemini response.
         return {"response": combined_response_text.strip()}
