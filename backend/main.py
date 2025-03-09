@@ -57,12 +57,19 @@ def load_schema(schema_id):
     filename = schema_mapping.get(schema_id)
     if filename is None:
         return None
-        
+    
+    # Get the directory where the script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Go up one level to the project root
+    project_root = os.path.dirname(script_dir)
+    # Construct absolute path to the schema file
+    schema_path = os.path.join(project_root, filename)
+    
     try:
-        with open(filename, 'r') as f:
+        with open(schema_path, 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error loading schema {schema_id} from {filename}: {e}")
+        print(f"Error loading schema {schema_id} from {schema_path}: {e}")
         return None
 
 # Function to generate a schema-specific prompt
@@ -459,15 +466,55 @@ async def process_page(page, schema="generic"):
     # Return the JSON response to be merged later
     return json_response.text
 
+def deep_merge(base, addition):
+    """
+    Recursively merge two dictionaries.
+    - Lists are concatenated
+    - Dictionaries are merged recursively
+    - For other values, the first occurrence (base) is kept
+    
+    Parameters:
+    base (dict): The base dictionary to merge into
+    addition (dict): The dictionary to merge from
+    
+    Returns:
+    dict: The merged dictionary
+    """
+    # Create a copy to avoid modifying the original
+    result = base.copy()
+    
+    for key, value in addition.items():
+        # If key not in result, just add it
+        if key not in result:
+            result[key] = value
+        else:
+            # If both are lists, extend the base list
+            if isinstance(result[key], list) and isinstance(value, list):
+                result[key].extend(value)
+            
+            # If both are dictionaries, merge them recursively
+            elif isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = deep_merge(result[key], value)
+            
+            # For boolean values, use logical OR (True if either is True)
+            # This helps with fields like "additionalDesigneesAttached"
+            elif isinstance(result[key], bool) and isinstance(value, bool):
+                result[key] = result[key] or value
+            
+            # Otherwise, keep the original value (from base)
+            # We prioritize data from the first page for singleton values
+    
+    return result
+
 def merge_page_results(page_results):
     """
     Merge JSON results from multiple pages.
     For document-level fields, we assume they are the same across pages and only keep the first occurrence.
-    For list fields (e.g., lineItems), we concatenate them.
+    For list fields, we concatenate them, regardless of where they appear in the JSON structure.
     """
     merged = None
     
-    # First, merge all the basic document data
+    # Process each page
     for result in page_results:
         try:
             data = json.loads(result)
@@ -477,17 +524,8 @@ def merge_page_results(page_results):
         if merged is None:
             merged = data
         else:
-            # Merge lineItems arrays if they exist
-            if "lineItems" in data and isinstance(data["lineItems"], list):
-                merged.setdefault("lineItems", []).extend(data["lineItems"])
-            
-            # Merge additionalData arrays (attachments, referenceNumbers, auditTrail)
-            if "additionalData" in data:
-                for key in ["attachments", "referenceNumbers", "auditTrail"]:
-                    if key in data["additionalData"]:
-                        merged.setdefault("additionalData", {}).setdefault(key, []).extend(
-                            data["additionalData"][key]
-                        )
+            # Use deep merge to recursively combine the data
+            merged = deep_merge(merged, data)
     
     # Remove any extractionVerification fields - we'll perform a new verification on the complete document
     if merged and "extractionVerification" in merged:

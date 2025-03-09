@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import "./App.css";
 import VendorResearch from "./VendorResearch";
 import ExtractionVerification from "./ExtractionVerification";
+import SchemaSelector from "./SchemaSelector";
 
 const PDFProcessor = () => {
   const [file, setFile] = useState(null);
@@ -15,6 +16,7 @@ const PDFProcessor = () => {
   const [parsedData, setParsedData] = useState(null);
   const [vendorName, setVendorName] = useState("");
   const [documentType, setDocumentType] = useState("Unknown");
+  const [selectedSchema, setSelectedSchema] = useState("generic");
   const fileInputRef = useRef(null);
   const bankFileInputRef = useRef(null);
   const dropContainerRef = useRef(null);
@@ -183,6 +185,10 @@ const PDFProcessor = () => {
     }
   };
 
+  const handleSchemaChange = (schema) => {
+    setSelectedSchema(schema);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
@@ -213,6 +219,7 @@ const PDFProcessor = () => {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("schema", selectedSchema); // Add the schema to the form data
 
     try {
       const res = await fetch("http://localhost:8000/process-pdf", {
@@ -328,6 +335,12 @@ const PDFProcessor = () => {
             </p>
 
             <form onSubmit={handleSubmit}>
+              {/* Schema selector added here */}
+              <SchemaSelector
+                selectedSchema={selectedSchema}
+                onSchemaChange={handleSchemaChange}
+              />
+
               <div className="form-group">
                 <label htmlFor="pdfFile" className="form-label">Upload Document</label>
                 <div 
