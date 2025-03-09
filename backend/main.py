@@ -471,7 +471,8 @@ def deep_merge(base, addition):
     Recursively merge two dictionaries.
     - Lists are concatenated
     - Dictionaries are merged recursively
-    - For other values, the first occurrence (base) is kept
+    - For other values, non-null values are preferred over null values
+    - For other cases where both values are non-null, the first occurrence (base) is kept
     
     Parameters:
     base (dict): The base dictionary to merge into
@@ -497,12 +498,13 @@ def deep_merge(base, addition):
                 result[key] = deep_merge(result[key], value)
             
             # For boolean values, use logical OR (True if either is True)
-            # This helps with fields like "additionalDesigneesAttached"
             elif isinstance(result[key], bool) and isinstance(value, bool):
                 result[key] = result[key] or value
             
-            # Otherwise, keep the original value (from base)
-            # We prioritize data from the first page for singleton values
+            # For other values, prefer non-null values over null/empty ones
+            elif result[key] is None and value is not None:
+                result[key] = value
+            # If both values exist and neither is None, keep the base value (first page)
     
     return result
 
