@@ -1,0 +1,436 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Universal Payroll Data Schema",
+    "description": "Flexible schema for payroll data across different formats, states, and time periods",
+    "type": "object",
+    "properties": {
+      "companyInformation": {
+        "type": "object",
+        "description": "Information about the company",
+        "properties": {
+          "companyName": {
+            "type": "string",
+            "description": "Name of the company"
+          },
+          "documentType": {
+            "type": "string",
+            "description": "Type of document (e.g., 'Payroll Item Detail', 'Payroll Summary')"
+          },
+          "reportPeriod": {
+            "type": "string",
+            "description": "Time period covered by the report"
+          },
+          "reportDate": {
+            "type": "string",
+            "description": "Date the report was generated"
+          }
+        },
+        "required": ["companyName", "reportPeriod"]
+      },
+      "payrollSummary": {
+        "type": "object",
+        "description": "Company-wide payroll summary totals",
+        "properties": {
+          "totalHours": {
+            "type": "number",
+            "description": "Total hours worked across all employees"
+          },
+          "totalGrossPay": {
+            "type": "number",
+            "description": "Total gross pay across all employees"
+          },
+          "totalTaxesWithheld": {
+            "type": "number",
+            "description": "Total taxes withheld across all employees"
+          },
+          "totalNetPay": {
+            "type": "number",
+            "description": "Total net pay across all employees"
+          },
+          "totalEmployerContributions": {
+            "type": "number",
+            "description": "Total employer taxes and contributions"
+          }
+        }
+      },
+      "employees": {
+        "type": "array",
+        "description": "List of employees and their payroll data",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Employee's full name"
+            },
+            "employeeId": {
+              "type": "string",
+              "description": "Employee identification number (if available)"
+            },
+            "payrollPeriod": {
+              "type": "object",
+              "description": "Payroll period information",
+              "properties": {
+                "startDate": {
+                  "type": "string",
+                  "description": "Start date of the payroll period"
+                },
+                "endDate": {
+                  "type": "string",
+                  "description": "End date of the payroll period"
+                },
+                "periodDescription": {
+                  "type": "string",
+                  "description": "Description of the period (e.g., 'Apr - Jun 21')"
+                }
+              }
+            },
+            "earnings": {
+              "type": "object",
+              "description": "Earnings details",
+              "properties": {
+                "hourlyRate": {
+                  "type": "number",
+                  "description": "Regular hourly rate"
+                },
+                "overtimeRate": {
+                  "type": "number",
+                  "description": "Overtime hourly rate (typically 1.5x regular rate)"
+                },
+                "holidayRate": {
+                  "type": "number",
+                  "description": "Holiday pay rate"
+                },
+                "regularHours": {
+                  "type": "number",
+                  "description": "Regular hours worked"
+                },
+                "overtimeHours": {
+                  "type": "number",
+                  "description": "Overtime hours worked"
+                },
+                "holidayHours": {
+                  "type": "number",
+                  "description": "Holiday hours"
+                },
+                "paidTimeOffHours": {
+                  "type": "number",
+                  "description": "Paid time off hours"
+                },
+                "regularPay": {
+                  "type": "number",
+                  "description": "Regular pay amount"
+                },
+                "overtimePay": {
+                  "type": "number",
+                  "description": "Overtime pay amount"
+                },
+                "holidayPay": {
+                  "type": "number",
+                  "description": "Holiday pay amount"
+                },
+                "paidTimeOffPay": {
+                  "type": "number",
+                  "description": "Paid time off pay amount"
+                },
+                "reportedCashTips": {
+                  "type": "number",
+                  "description": "Reported cash tips"
+                },
+                "reportedPaycheckTips": {
+                  "type": "number",
+                  "description": "Reported paycheck tips"
+                },
+                "otherEarnings": {
+                  "type": "array",
+                  "description": "Other types of earnings",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "description": "Description of the earning"
+                      },
+                      "amount": {
+                        "type": "number",
+                        "description": "Amount of the earning"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "grossPay": {
+              "type": "number",
+              "description": "Total gross pay"
+            },
+            "adjustedGrossPay": {
+              "type": "number",
+              "description": "Adjusted gross pay (after pre-tax adjustments if any)"
+            },
+            "deductions": {
+              "type": "object",
+              "description": "Employee deductions and taxes withheld",
+              "properties": {
+                "federalWithholding": {
+                  "type": "number",
+                  "description": "Federal income tax withholding"
+                },
+                "stateWithholding": {
+                  "type": "object",
+                  "description": "State income tax withholding",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "description": "State code (e.g., 'CA', 'NY')"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "Withholding amount"
+                    }
+                  }
+                },
+                "socialSecurityEmployee": {
+                  "type": "number",
+                  "description": "Social Security tax (employee portion)"
+                },
+                "medicareEmployee": {
+                  "type": "number",
+                  "description": "Medicare tax (employee portion)"
+                },
+                "medicareEmployeeAddlTax": {
+                  "type": "number",
+                  "description": "Additional Medicare tax for high-income earners"
+                },
+                "stateDisability": {
+                  "type": "object",
+                  "description": "State disability insurance",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "description": "State code"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "Amount"
+                    }
+                  }
+                },
+                "otherDeductions": {
+                  "type": "array",
+                  "description": "Other deductions",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "description": "Description of the deduction"
+                      },
+                      "amount": {
+                        "type": "number",
+                        "description": "Amount of the deduction"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "totalTaxesWithheld": {
+              "type": "number",
+              "description": "Total taxes withheld"
+            },
+            "netPay": {
+              "type": "number",
+              "description": "Net pay amount (gross pay minus deductions)"
+            },
+            "employerContributions": {
+              "type": "object",
+              "description": "Employer taxes and contributions",
+              "properties": {
+                "socialSecurityCompany": {
+                  "type": "number",
+                  "description": "Social Security tax (employer portion)"
+                },
+                "medicareCompany": {
+                  "type": "number",
+                  "description": "Medicare tax (employer portion)"
+                },
+                "federalUnemployment": {
+                  "type": "number",
+                  "description": "Federal unemployment tax (FUTA)"
+                },
+                "stateUnemployment": {
+                  "type": "object",
+                  "description": "State unemployment tax",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "description": "State code"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "Amount"
+                    }
+                  }
+                },
+                "employmentTrainingTax": {
+                  "type": "object",
+                  "description": "Employment training tax",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "description": "State code"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "Amount"
+                    }
+                  }
+                },
+                "otherContributions": {
+                  "type": "array",
+                  "description": "Other employer contributions",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "description": "Description of the contribution"
+                      },
+                      "amount": {
+                        "type": "number",
+                        "description": "Amount of the contribution"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "totalEmployerContributions": {
+              "type": "number",
+              "description": "Total employer taxes and contributions"
+            },
+            "paychecks": {
+              "type": "array",
+              "description": "List of individual paychecks (for detailed reports)",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "checkNumber": {
+                    "type": "string",
+                    "description": "Paycheck identification number"
+                  },
+                  "checkDate": {
+                    "type": "string",
+                    "description": "Date of the paycheck"
+                  },
+                  "payPeriodStart": {
+                    "type": "string",
+                    "description": "Start date of the pay period"
+                  },
+                  "payPeriodEnd": {
+                    "type": "string",
+                    "description": "End date of the pay period"
+                  },
+                  "grossAmount": {
+                    "type": "number",
+                    "description": "Gross amount of the paycheck"
+                  },
+                  "netAmount": {
+                    "type": "number",
+                    "description": "Net amount of the paycheck"
+                  },
+                  "payrollItems": {
+                    "type": "array",
+                    "description": "Individual payroll items",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "itemType": {
+                          "type": "string",
+                          "description": "Type of payroll item"
+                        },
+                        "wageBase": {
+                          "type": "number",
+                          "description": "Base wage for calculation"
+                        },
+                        "amount": {
+                          "type": "number",
+                          "description": "Amount"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      "payrollTaxes": {
+        "type": "object",
+        "description": "Applicable tax rates and limits",
+        "properties": {
+          "federalTaxRates": {
+            "type": "object",
+            "description": "Federal tax rates",
+            "properties": {
+              "socialSecurityRate": {
+                "type": "number",
+                "description": "Social Security tax rate"
+              },
+              "medicareRate": {
+                "type": "number",
+                "description": "Medicare tax rate"
+              },
+              "futaRate": {
+                "type": "number",
+                "description": "Federal Unemployment Tax Act rate"
+              }
+            }
+          },
+          "stateTaxRates": {
+            "type": "object",
+            "description": "State tax rates by state code",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "unemploymentRate": {
+                  "type": "number",
+                  "description": "State unemployment tax rate"
+                },
+                "disabilityRate": {
+                  "type": "number",
+                  "description": "State disability insurance rate"
+                },
+                "trainingTaxRate": {
+                  "type": "number",
+                  "description": "State employment training tax rate"
+                }
+              }
+            }
+          }
+        }
+      },
+      "metadata": {
+        "type": "object",
+        "description": "Additional metadata about the payroll document",
+        "properties": {
+          "generatedBy": {
+            "type": "string",
+            "description": "Software or system that generated the report"
+          },
+          "reportFormat": {
+            "type": "string",
+            "description": "Format of the original report (e.g., 'PDF', 'CSV')"
+          },
+          "processingDate": {
+            "type": "string",
+            "description": "Date the data was processed"
+          }
+        }
+      }
+    },
+    "required": ["companyInformation", "employees"]
+  }

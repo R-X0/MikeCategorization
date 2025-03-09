@@ -205,8 +205,8 @@ def detect_document_type(json_data):
 
 async def verify_extraction(json_data):
     """
-    Verify the extraction accuracy by comparing row and column sums with their totals
-    in the document itself, rather than applying financial formulas that may not apply.
+    Verify the mathematical accuracy of the extracted data by focusing on 
+    calculation discrepancies rather than trivial formatting differences.
     
     Parameters:
     json_data (dict): The structured JSON data extracted from the document
@@ -218,66 +218,49 @@ async def verify_extraction(json_data):
         # First, detect document type to apply appropriate verification rules
         document_type = detect_document_type(json_data)
         
-        # Create a prompt for Gemini that focuses on extraction accuracy
+        # Update the prompt to focus on mathematical verification
         verification_prompt = f"""
-        Analyze this financial document data to verify EXTRACTION ACCURACY, not mathematical correctness.
+        Analyze this financial document data to verify MATHEMATICAL ACCURACY only.
         
         DOCUMENT TYPE: {document_type.upper()}
         
         CRITICAL INSTRUCTIONS:
-        1. DO NOT verify financial formulas (like subtotal + tax = total) unless explicitly stated in the document.
-        2. Instead, focus on verifying that values were correctly extracted from the document:
-           - Verify column sums match their stated totals in the document
-           - Verify row calculations match their stated results in the document
-           - Identify likely OCR/extraction errors (e.g., "0" extracted as "O", "1" as "l", etc.)
-        
-        3. Apply different verification approaches based on document type:
-        
-           FOR PAYMENT PROCESSING STATEMENTS OR MERCHANT STATEMENTS:
-           - Verify that column sums match the extracted totals shown in the document itself
-           - DO NOT assume that totals should equal the sum of line items unless explicitly stated
-           - Simply check if the extraction matches what's actually in the document
-        
-           FOR INVOICES AND RECEIPTS:
-           - Verify that extracted line items match their stated totals in the document
-           - Check that document's own calculated values were correctly extracted
-        
-           FOR BANK STATEMENTS:
-           - Verify that transaction amounts were correctly extracted
-           - Check that running balances match what's shown in the document
-        
-        4. When reviewing numerical values:
-           - Check for common extraction errors with decimal points (e.g., 1.00 vs 100)
-           - Check for common digit extraction errors (e.g., 7 vs 1, 8 vs 3, 5 vs 6)
-           - Verify that signs (positive/negative) were correctly captured
-        
-        IMPORTANT GUIDELINES:
-        - Your primary goal is to verify EXTRACTION ACCURACY, not financial correctness
-        - The document itself might contain mathematical errors - that's not what you're checking
-        - You're checking if the JSON data accurately represents what's actually in the document
-        - Focus on clear extraction errors where digits or decimal points were misread
+        1. IGNORE all formatting differences (e.g., "90" vs 90, spaces, character encoding)
+        2. IGNORE data type differences (string vs number) - only care about the numeric value
+        3. FOCUS ONLY on verification of financial calculations:
+           - For invoices: Check if quantity × price = line totals
+           - For all documents: Verify line items sum up to stated subtotals or totals
+           - Check if subtotal + tax = total amount (where applicable)
+           - For statements: Verify opening balance + transactions = closing balance
+         
+        4. Mathematical rules that should be checked:
+           - Line items: quantity × unit price = line total
+           - Document totals: sum of line totals = subtotal
+           - Tax calculation: subtotal × tax rate = tax amount
+           - Final total: subtotal + tax + fees - discounts = total amount
         
         Financial Data:
         {json.dumps(json_data, indent=2)}
         
         Return your verification as JSON with this strict structure:
         {{
-          "extractionVerified": Boolean (true if extraction is accurate, false if clear extraction errors exist),
+          "extractionVerified": Boolean (true if calculations are accurate, false if calculation errors exist),
           "discrepancies": [
             {{
-              "type": "String (LineItem, Column Total, Row Sum, etc.)",
-              "location": "String (reference to where in the document this occurs)",
-              "documentValue": "String/Number (what appears to be in the document)",
-              "extractedValue": "String/Number (what was extracted in the JSON)",
-              "likelyCorrectValue": "String/Number (the most likely correct value)",
+              "type": "String (Line Total, Subtotal, Tax Calculation, etc.)",
+              "location": "String (reference to where in the document this calculation occurs)",
+              "expectedValue": "Number (what the calculation should produce)",
+              "extractedValue": "Number (what was extracted in the document)",
+              "likelyCorrectValue": "Number (the most likely correct value)",
+              "formula": "String (the formula used for this calculation)",
               "confidence": "String (High, Medium, Low)"
             }}
           ],
-          "summary": "String (brief explanation of extraction verification results)"
+          "summary": "String (brief explanation of calculation verification results)"
         }}
         
-        Only include discrepancies that appear to be EXTRACTION ERRORS, not mathematical inconsistencies in the document itself.
-        Rate the confidence of each discrepancy based on the clarity of the extraction error.
+        ONLY include discrepancies that are TRUE CALCULATION ERRORS where numbers don't add up correctly.
+        DO NOT flag differences in formatting, string representations, or character encoding.
         """
         
         # Make the API call to Gemini
@@ -295,24 +278,32 @@ async def verify_extraction(json_data):
         try:
             verification_results = json.loads(verification_response.text)
             
-            # Filter out low confidence discrepancies if there are too many
-            if "discrepancies" in verification_results and len(verification_results["discrepancies"]) > 10:
-                # Keep only high and medium confidence issues
-                significant_issues = [d for d in verification_results["discrepancies"] 
-                                     if d.get("confidence", "Low") in ["High", "Medium"]]
+            # Keep only significant calculation discrepancies
+            if "discrepancies" in verification_results and len(verification_results["discrepancies"]) > 0:
+                # Filter out any discrepancies where the numeric values are actually the same
+                significant_issues = []
+                for d in verification_results["discrepancies"]:
+                    # Try to convert both values to floats for comparison
+                    try:
+                        expected = float(str(d.get("expectedValue", "0")).replace(",", ""))
+                        actual = float(str(d.get("extractedValue", "0")).replace(",", ""))
+                        
+                        # Only keep discrepancies where values are numerically different
+                        if abs(expected - actual) > 0.01:  # Allow for small rounding differences
+                            significant_issues.append(d)
+                    except:
+                        # If we can't convert to float, keep the discrepancy
+                        significant_issues.append(d)
                 
-                # If we still have more than 5 discrepancies, prioritize high confidence only
-                if len(significant_issues) > 5:
-                    high_confidence_issues = [d for d in significant_issues 
-                                              if d.get("confidence", "") == "High"]
-                    # If we have high confidence issues, use only those
-                    if high_confidence_issues:
-                        verification_results["discrepancies"] = high_confidence_issues
-                    else:
-                        # Otherwise use the top 5 medium issues
-                        verification_results["discrepancies"] = significant_issues[:5]
-                else:
-                    verification_results["discrepancies"] = significant_issues
+                verification_results["discrepancies"] = significant_issues
+                
+                # Update the verification status based on filtered discrepancies
+                verification_results["extractionVerified"] = len(significant_issues) == 0
+                
+                # Update summary if needed
+                if len(significant_issues) == 0 and not verification_results["extractionVerified"]:
+                    verification_results["summary"] = "No significant calculation discrepancies found after filtering."
+                    verification_results["extractionVerified"] = True
             
             # Add verification results to the original JSON
             json_data["extractionVerification"] = verification_results

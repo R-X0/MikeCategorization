@@ -1,0 +1,302 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Form 1040 U.S. Individual Income Tax Return",
+    "type": "object",
+    "properties": {
+      "taxYear": {
+        "type": "string",
+        "description": "Tax year of the return"
+      },
+      "filingStatus": {
+        "type": "string",
+        "enum": ["Single", "MarriedFilingJointly", "MarriedFilingSeparately", "HeadOfHousehold", "QualifyingWidower"],
+        "description": "Filing status of the taxpayer"
+      },
+      "qualifyingPersonName": {
+        "type": "string",
+        "description": "Name of qualifying person if HOH or QW status is selected"
+      },
+      "personalInfo": {
+        "type": "object",
+        "properties": {
+          "taxpayer": {
+            "type": "object",
+            "properties": {
+              "firstName": {"type": "string"},
+              "middleInitial": {"type": "string"},
+              "lastName": {"type": "string"},
+              "ssn": {"type": "string", "description": "Social Security Number"},
+              "dateOfBirth": {"type": "string", "format": "date"},
+              "isBlind": {"type": "boolean"},
+              "occupation": {"type": "string"}
+            }
+          },
+          "spouse": {
+            "type": "object",
+            "properties": {
+              "firstName": {"type": "string"},
+              "middleInitial": {"type": "string"},
+              "lastName": {"type": "string"},
+              "ssn": {"type": "string", "description": "Social Security Number"},
+              "dateOfBirth": {"type": "string", "format": "date"},
+              "isBlind": {"type": "boolean"},
+              "occupation": {"type": "string"}
+            }
+          },
+          "contactInfo": {
+            "type": "object",
+            "properties": {
+              "address": {"type": "string"},
+              "apartmentNumber": {"type": "string"},
+              "city": {"type": "string"},
+              "state": {"type": "string"},
+              "zipCode": {"type": "string"},
+              "foreignCountry": {"type": "string"},
+              "foreignProvince": {"type": "string"},
+              "foreignPostalCode": {"type": "string"},
+              "phoneNumber": {"type": "string"},
+              "emailAddress": {"type": "string"}
+            }
+          }
+        }
+      },
+      "presidentialElectionCampaign": {
+        "type": "object",
+        "properties": {
+          "taxpayer": {"type": "boolean"},
+          "spouse": {"type": "boolean"}
+        },
+        "description": "Indication if $3 should go to Presidential Election Campaign fund"
+      },
+      "virtualCurrency": {
+        "type": "boolean",
+        "description": "Indicates if taxpayer received, sold, exchanged, or disposed of virtual currency"
+      },
+      "standardDeduction": {
+        "type": "object",
+        "properties": {
+          "canBeClaimed": {
+            "type": "object",
+            "properties": {
+              "taxpayerAsDependent": {"type": "boolean"},
+              "spouseAsDependent": {"type": "boolean"}
+            }
+          },
+          "spouseItemizesSeparately": {"type": "boolean"},
+          "isDualStatusAlien": {"type": "boolean"}
+        }
+      },
+      "dependents": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "firstName": {"type": "string"},
+            "lastName": {"type": "string"},
+            "ssn": {"type": "string"},
+            "relationship": {"type": "string"},
+            "qualifiesForChildTaxCredit": {"type": "boolean"},
+            "qualifiesForCreditForOtherDependents": {"type": "boolean"}
+          }
+        }
+      },
+      "income": {
+        "type": "object",
+        "properties": {
+          "wages": {"type": "number", "description": "Wages, salaries, tips (line 1)"},
+          "taxExemptInterest": {"type": "number", "description": "Tax-exempt interest (line 2a)"},
+          "taxableInterest": {"type": "number", "description": "Taxable interest (line 2b)"},
+          "qualifiedDividends": {"type": "number", "description": "Qualified dividends (line 3a)"},
+          "ordinaryDividends": {"type": "number", "description": "Ordinary dividends (line 3b)"},
+          "iraDistributions": {
+            "type": "object",
+            "properties": {
+              "total": {"type": "number", "description": "Total IRA distributions (line 4a)"},
+              "taxable": {"type": "number", "description": "Taxable amount (line 4b)"}
+            }
+          },
+          "pensionsAndAnnuities": {
+            "type": "object",
+            "properties": {
+              "total": {"type": "number", "description": "Total pensions and annuities (line 5a)"},
+              "taxable": {"type": "number", "description": "Taxable amount (line 5b)"}
+            }
+          },
+          "socialSecurityBenefits": {
+            "type": "object",
+            "properties": {
+              "total": {"type": "number", "description": "Total social security benefits (line 6a)"},
+              "taxable": {"type": "number", "description": "Taxable amount (line 6b)"}
+            }
+          },
+          "capitalGainOrLoss": {"type": "number", "description": "Capital gain or (loss) (line 7)"},
+          "otherIncome": {"type": "number", "description": "Other income from Schedule 1 (line 8)"},
+          "totalIncome": {"type": "number", "description": "Total income (line 9)"}
+        }
+      },
+      "adjustmentsToIncome": {
+        "type": "number",
+        "description": "Adjustments to income from Schedule 1 (line 10)"
+      },
+      "adjustedGrossIncome": {
+        "type": "number",
+        "description": "Adjusted gross income (line 11)"
+      },
+      "deductions": {
+        "type": "object",
+        "properties": {
+          "standardOrItemized": {"type": "number", "description": "Standard deduction or itemized deductions (line 12a)"},
+          "charitableContributions": {"type": "number", "description": "Charitable contributions with standard deduction (line 12b)"},
+          "total": {"type": "number", "description": "Total of 12a and 12b (line 12c)"}
+        }
+      },
+      "qualifiedBusinessIncomeDeduction": {
+        "type": "number",
+        "description": "Qualified business income deduction (line 13)"
+      },
+      "totalDeductions": {
+        "type": "number",
+        "description": "Total deductions (line 14)"
+      },
+      "taxableIncome": {
+        "type": "number",
+        "description": "Taxable income (line 15)"
+      },
+      "tax": {
+        "type": "object",
+        "properties": {
+          "baseTax": {"type": "number", "description": "Tax amount (line 16)"},
+          "formReferences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["8814", "4972"]
+            }
+          },
+          "schedule2Amount": {"type": "number", "description": "Amount from Schedule 2, line 3 (line 17)"},
+          "total": {"type": "number", "description": "Total tax (line 18)"}
+        }
+      },
+      "nonrefundableCredits": {
+        "type": "object",
+        "properties": {
+          "childTaxCredit": {"type": "number", "description": "Nonrefundable child tax credit (line 19)"},
+          "schedule3Amount": {"type": "number", "description": "Amount from Schedule 3, line 8 (line 20)"},
+          "total": {"type": "number", "description": "Total credits (line 21)"}
+        }
+      },
+      "taxAfterCredits": {
+        "type": "number",
+        "description": "Tax after credits (line 22)"
+      },
+      "otherTaxes": {
+        "type": "number",
+        "description": "Other taxes including self-employment tax (line 23)"
+      },
+      "totalTax": {
+        "type": "number",
+        "description": "Total tax (line 24)"
+      },
+      "payments": {
+        "type": "object",
+        "properties": {
+          "federalIncomeTaxWithheld": {
+            "type": "object",
+            "properties": {
+              "w2": {"type": "number", "description": "From W-2 forms (line 25a)"},
+              "form1099": {"type": "number", "description": "From 1099 forms (line 25b)"},
+              "otherForms": {"type": "number", "description": "From other forms (line 25c)"},
+              "total": {"type": "number", "description": "Total federal income tax withheld (line 25d)"}
+            }
+          },
+          "estimatedTaxPayments": {"type": "number", "description": "2021 estimated tax payments (line 26)"},
+          "earnedIncomeCredit": {
+            "type": "object",
+            "properties": {
+              "amount": {"type": "number", "description": "Earned income credit (line 27a)"},
+              "nontaxableCombatPay": {"type": "number", "description": "Nontaxable combat pay election (line 27b)"},
+              "priorYearEarnedIncome": {"type": "number", "description": "Prior year earned income (line 27c)"}
+            }
+          },
+          "refundableChildTaxCredit": {"type": "number", "description": "Refundable child tax credit (line 28)"},
+          "americanOpportunityCredit": {"type": "number", "description": "American opportunity credit (line 29)"},
+          "recoveryRebateCredit": {"type": "number", "description": "Recovery rebate credit (line 30)"},
+          "schedule3Line15Amount": {"type": "number", "description": "Amount from Schedule 3, line 15 (line 31)"},
+          "totalOtherPayments": {"type": "number", "description": "Total other payments and refundable credits (line 32)"},
+          "totalPayments": {"type": "number", "description": "Total payments (line 33)"}
+        }
+      },
+      "refund": {
+        "type": "object",
+        "properties": {
+          "overpaymentAmount": {"type": "number", "description": "Amount overpaid (line 34)"},
+          "refundAmount": {"type": "number", "description": "Amount to be refunded (line 35a)"},
+          "directDeposit": {
+            "type": "object",
+            "properties": {
+              "routingNumber": {"type": "string", "description": "Bank routing number (line 35b)"},
+              "accountType": {"type": "string", "enum": ["Checking", "Savings"], "description": "Account type (line 35c)"},
+              "accountNumber": {"type": "string", "description": "Bank account number (line 35d)"}
+            }
+          },
+          "appliedToEstimatedTax": {"type": "number", "description": "Amount applied to 2022 estimated tax (line 36)"}
+        }
+      },
+      "amountOwed": {
+        "type": "object",
+        "properties": {
+          "amountYouOwe": {"type": "number", "description": "Amount you owe (line 37)"},
+          "estimatedTaxPenalty": {"type": "number", "description": "Estimated tax penalty (line 38)"}
+        }
+      },
+      "thirdPartyDesignee": {
+        "type": "object",
+        "properties": {
+          "allowDiscussion": {"type": "boolean", "description": "Allow another person to discuss return with IRS"},
+          "designeeName": {"type": "string", "description": "Designee's name"},
+          "designeePhone": {"type": "string", "description": "Designee's phone number"},
+          "personalIdentificationNumber": {"type": "string", "description": "Personal identification number (PIN)"}
+        }
+      },
+      "signatures": {
+        "type": "object",
+        "properties": {
+          "taxpayer": {
+            "type": "object",
+            "properties": {
+              "signature": {"type": "string"},
+              "date": {"type": "string", "format": "date"},
+              "identityProtectionPIN": {"type": "string", "description": "IRS Identity Protection PIN"}
+            }
+          },
+          "spouse": {
+            "type": "object",
+            "properties": {
+              "signature": {"type": "string"},
+              "date": {"type": "string", "format": "date"},
+              "identityProtectionPIN": {"type": "string", "description": "IRS Identity Protection PIN"}
+            }
+          }
+        }
+      },
+      "paidPreparer": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "Preparer's name"},
+          "signature": {"type": "string", "description": "Preparer's signature"},
+          "date": {"type": "string", "format": "date", "description": "Date prepared"},
+          "ptin": {"type": "string", "description": "Preparer Tax Identification Number"},
+          "selfEmployed": {"type": "boolean", "description": "Indicates if preparer is self-employed"},
+          "firmInfo": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string", "description": "Firm's name"},
+              "address": {"type": "string", "description": "Firm's address"},
+              "ein": {"type": "string", "description": "Firm's Employer Identification Number"},
+              "phoneNumber": {"type": "string", "description": "Firm's phone number"}
+            }
+          }
+        }
+      }
+    }
+  }

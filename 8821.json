@@ -1,0 +1,135 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "IRS Form 8821 - Tax Information Authorization",
+    "type": "object",
+    "properties": {
+      "formMetadata": {
+        "type": "object",
+        "properties": {
+          "formNumber": { "type": "string" },
+          "revisionDate": { "type": "string" },
+          "ombNumber": { "type": "string" }
+        }
+      },
+      "taxpayerInformation": {
+        "type": "object",
+        "description": "Section 1: Taxpayer information",
+        "properties": {
+          "name": { "type": "string" },
+          "address": { 
+            "type": "object",
+            "properties": {
+              "street": { "type": "string" },
+              "city": { "type": "string" },
+              "state": { "type": "string" },
+              "zipCode": { "type": "string" }
+            }
+          },
+          "taxpayerIdentificationNumber": { "type": "string" },
+          "daytimeTelephoneNumber": { "type": "string" },
+          "planNumber": { "type": "string" }
+        },
+        "required": ["name", "address", "taxpayerIdentificationNumber"]
+      },
+      "designees": {
+        "type": "object",
+        "description": "Section 2: Designee(s)",
+        "properties": {
+          "additionalDesigneesAttached": { "type": "boolean" },
+          "designeeList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "address": { 
+                  "type": "object",
+                  "properties": {
+                    "street": { "type": "string" },
+                    "city": { "type": "string" },
+                    "state": { "type": "string" },
+                    "zipCode": { "type": "string" }
+                  }
+                },
+                "receiveCopiesOfNotices": { "type": "boolean" },
+                "cafNumber": { "type": "string" },
+                "ptin": { "type": "string" },
+                "telephoneNumber": { "type": "string" },
+                "faxNumber": { "type": "string" },
+                "isNew": {
+                  "type": "object",
+                  "properties": {
+                    "address": { "type": "boolean" },
+                    "telephoneNumber": { "type": "boolean" },
+                    "faxNumber": { "type": "boolean" }
+                  }
+                }
+              },
+              "required": ["name", "address"]
+            }
+          }
+        }
+      },
+      "taxInformation": {
+        "type": "object",
+        "description": "Section 3: Tax information",
+        "properties": {
+          "authorizeIntermediateServiceProvider": { "type": "boolean" },
+          "taxMatters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "typeOfTaxInformation": { "type": "string" },
+                "taxFormNumber": { "type": "string" },
+                "yearsOrPeriods": { "type": "string" },
+                "specificTaxMatters": { "type": "string" }
+              },
+              "required": ["typeOfTaxInformation", "taxFormNumber", "yearsOrPeriods"]
+            }
+          }
+        }
+      },
+      "specificUse": {
+        "type": "object",
+        "description": "Section 4: Specific use not recorded on CAF",
+        "properties": {
+          "notRecordedOnCAF": { "type": "boolean" }
+        }
+      },
+      "retentionRevocation": {
+        "type": "object",
+        "description": "Section 5: Retention/revocation of prior tax information authorizations",
+        "properties": {
+          "retainPriorAuthorizations": { "type": "boolean" }
+        }
+      },
+      "taxpayerSignature": {
+        "type": "object",
+        "description": "Section 6: Taxpayer signature",
+        "properties": {
+          "signatureMethod": { "type": "string" },
+          "signatureDate": { "type": "string" },
+          "printName": { "type": "string" },
+          "title": { "type": "string" },
+          "eSignDetails": {
+            "type": "object",
+            "properties": {
+              "timestamp": { "type": "string" },
+              "documentNumber": { "type": "string" }
+            }
+          }
+        },
+        "required": ["signatureDate", "printName"]
+      },
+      "additionalInformation": {
+        "type": "object",
+        "properties": {
+          "preparedBy": { "type": "string" },
+          "purpose": { "type": "string" },
+          "verificationStatement": { "type": "string" }
+        }
+      }
+    },
+    "required": ["taxpayerInformation", "designees", "taxInformation", "taxpayerSignature"]
+  }

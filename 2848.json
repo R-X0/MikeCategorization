@@ -1,0 +1,109 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "IRS Form 2848 - Power of Attorney and Declaration of Representative",
+    "type": "object",
+    "properties": {
+      "formMetadata": {
+        "type": "object",
+        "properties": {
+          "formNumber": { "type": "string" },
+          "revisionDate": { "type": "string" },
+          "ombNumber": { "type": "string" }
+        }
+      },
+      "partI_PowerOfAttorney": {
+        "type": "object",
+        "properties": {
+          "taxpayerInformation": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "address": { "type": "string" },
+              "taxpayerIdentificationNumbers": { "type": "array", "items": { "type": "string" } },
+              "daytimePhoneNumber": { "type": "string" },
+              "planNumber": { "type": "string" }
+            }
+          },
+          "representatives": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "address": { "type": "string" },
+                "receiveNoticesAndCommunications": { "type": "boolean" },
+                "cafNo": { "type": "string" },
+                "ptin": { "type": "string" },
+                "telephoneNo": { "type": "string" },
+                "faxNo": { "type": "string" },
+                "newInformation": {
+                  "type": "object",
+                  "properties": {
+                    "address": { "type": "boolean" },
+                    "telephoneNo": { "type": "boolean" },
+                    "faxNo": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "actsAuthorized": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "descriptionOfMatter": { "type": "string" },
+                "taxFormNumber": { "type": "string" },
+                "yearsOrPeriods": { "type": "string" }
+              }
+            }
+          },
+          "specificUseNotRecordedOnCAF": { "type": "boolean" },
+          "additionalActsAuthorized": {
+            "type": "object",
+            "properties": {
+              "accessIRSRecordsViaIntermediateServiceProvider": { "type": "boolean" },
+              "authorizeDisclosureToThirdParties": { "type": "boolean" },
+              "substituteOrAddRepresentatives": { "type": "boolean" },
+              "signReturn": { "type": "boolean" },
+              "otherActsAuthorized": { "type": "string" }
+            }
+          },
+          "specificActsNotAuthorized": { "type": "string" },
+          "retentionRevocationOfPriorPOA": {
+            "type": "object",
+            "properties": {
+              "doNotRevokePriorPOA": { "type": "boolean" }
+            }
+          },
+          "taxpayerDeclarationAndSignature": {
+            "type": "object",
+            "properties": {
+              "signature": { "type": "string" },
+              "date": { "type": "string" },
+              "title": { "type": "string" },
+              "printName": { "type": "string" },
+              "printNameOfTaxpayerIfOtherThanIndividual": { "type": "string" }
+            }
+          }
+        }
+      },
+      "partII_DeclarationOfRepresentative": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "designation": {
+              "type": "string",
+              "enum": ["a", "b", "c", "d", "e", "f", "g", "h", "k", "r"],
+              "description": "Representative type code (a=Attorney, b=CPA, c=Enrolled Agent, etc.)"
+            },
+            "licensingJurisdiction": { "type": "string" },
+            "barLicenseCertificationNumber": { "type": "string" },
+            "signature": { "type": "string" },
+            "date": { "type": "string" }
+          }
+        }
+      }
+    }
+  }

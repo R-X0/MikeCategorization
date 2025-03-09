@@ -1,0 +1,267 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Form 941 - Employer's QUARTERLY Federal Tax Return",
+    "type": "object",
+    "properties": {
+      "formMetadata": {
+        "type": "object",
+        "properties": {
+          "formNumber": { "type": "string" },
+          "formRevision": { "type": "string" },
+          "year": { "type": "string" },
+          "ombNumber": { "type": "string" }
+        }
+      },
+      "employerInfo": {
+        "type": "object",
+        "properties": {
+          "ein": { "type": "string" },
+          "name": { "type": "string" },
+          "tradeName": { "type": "string" },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": { "type": "string" },
+              "city": { "type": "string" },
+              "state": { "type": "string" },
+              "zipCode": { "type": "string" },
+              "foreignCountry": { "type": "string" },
+              "foreignProvince": { "type": "string" },
+              "foreignPostalCode": { "type": "string" }
+            }
+          }
+        },
+        "required": ["ein", "name"]
+      },
+      "quarter": {
+        "type": "string",
+        "enum": ["1", "2", "3", "4"],
+        "description": "1: January, February, March; 2: April, May, June; 3: July, August, September; 4: October, November, December"
+      },
+      "part1": {
+        "type": "object",
+        "properties": {
+          "numberOfEmployees": { "type": "integer" },
+          "wagesTipsAndCompensation": { "type": "number" },
+          "federalIncomeTaxWithheld": { "type": "number" },
+          "noWagesSubjectToSocialSecurityMedicareTax": { "type": "boolean" },
+          "socialSecurityMedicareTaxes": {
+            "type": "object",
+            "properties": {
+              "taxableSocialSecurityWages": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "tax": { "type": "number" }
+                }
+              },
+              "qualifiedSickLeaveWagesBeforeApril": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "tax": { "type": "number" }
+                }
+              },
+              "qualifiedFamilyLeaveWagesBeforeApril": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "tax": { "type": "number" }
+                }
+              },
+              "taxableSocialSecurityTips": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "tax": { "type": "number" }
+                }
+              },
+              "taxableMedicareWagesAndTips": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "tax": { "type": "number" }
+                }
+              },
+              "taxableWagesTipsSubjectToAdditionalMedicare": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "number" },
+                  "tax": { "type": "number" }
+                }
+              }
+            }
+          },
+          "totalSocialSecurityAndMedicareTaxes": { "type": "number" },
+          "section3121qNoticeTax": { "type": "number" },
+          "totalTaxesBeforeAdjustments": { "type": "number" },
+          "adjustments": {
+            "type": "object",
+            "properties": {
+              "fractionsOfCents": { "type": "number" },
+              "sickPay": { "type": "number" },
+              "tipsAndGroupTermLifeInsurance": { "type": "number" }
+            }
+          },
+          "totalTaxesAfterAdjustments": { "type": "number" },
+          "nonRefundableCredits": {
+            "type": "object",
+            "properties": {
+              "smallBusinessPayrollTaxCredit": { "type": "number" },
+              "sickAndFamilyLeaveBeforeApril": { "type": "number" },
+              "employeeRetentionCredit": { "type": "number" },
+              "sickAndFamilyLeaveAfterMarch": { "type": "number" },
+              "cobraPremiumAssistance": { "type": "number" },
+              "numberOfIndividualsProvidedCOBRA": { "type": "integer" }
+            }
+          },
+          "totalNonrefundableCredits": { "type": "number" },
+          "totalTaxesAfterAdjustmentsAndCredits": { "type": "number" },
+          "totalDeposits": { "type": "number" },
+          "refundableCredits": {
+            "type": "object",
+            "properties": {
+              "sickAndFamilyLeaveBeforeApril": { "type": "number" },
+              "employeeRetentionCredit": { "type": "number" },
+              "sickAndFamilyLeaveAfterMarch": { "type": "number" },
+              "cobraPremiumAssistance": { "type": "number" }
+            }
+          },
+          "totalDepositsAndRefundableCredits": { "type": "number" },
+          "totalAdvancesFromForm7200": { "type": "number" },
+          "totalDepositsAndRefundableCreditsLessAdvances": { "type": "number" },
+          "balanceDue": { "type": "number" },
+          "overpayment": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "number" },
+              "applyToNextReturn": { "type": "boolean" },
+              "sendRefund": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "part2": {
+        "type": "object",
+        "properties": {
+          "depositSchedule": {
+            "type": "string",
+            "enum": ["lessLiability", "monthlySchedule", "semiweeklySchedule"]
+          },
+          "taxLiability": {
+            "type": "object",
+            "properties": {
+              "month1": { "type": "number" },
+              "month2": { "type": "number" },
+              "month3": { "type": "number" },
+              "totalLiability": { "type": "number" }
+            }
+          }
+        }
+      },
+      "part3": {
+        "type": "object",
+        "properties": {
+          "businessClosed": {
+            "type": "object",
+            "properties": {
+              "isClosed": { "type": "boolean" },
+              "finalDateWagesPaid": { "type": "string", "format": "date" }
+            }
+          },
+          "seasonalEmployer": { "type": "boolean" },
+          "recoveryStartupBusiness": { "type": "boolean" },
+          "qualifiedHealthPlanExpenses": {
+            "type": "object",
+            "properties": {
+              "sickLeaveBeforeApril": { "type": "number" },
+              "familyLeaveBeforeApril": { "type": "number" }
+            }
+          },
+          "employeeRetention": {
+            "type": "object",
+            "properties": {
+              "qualifiedWages": { "type": "number" },
+              "qualifiedHealthPlanExpenses": { "type": "number" }
+            }
+          },
+          "sickLeaveAfterMarch": {
+            "type": "object",
+            "properties": {
+              "qualifiedWages": { "type": "number" },
+              "qualifiedHealthPlanExpenses": { "type": "number" },
+              "collectivelyBargainedAmounts": { "type": "number" }
+            }
+          },
+          "familyLeaveAfterMarch": {
+            "type": "object",
+            "properties": {
+              "qualifiedWages": { "type": "number" },
+              "qualifiedHealthPlanExpenses": { "type": "number" },
+              "collectivelyBargainedAmounts": { "type": "number" }
+            }
+          }
+        }
+      },
+      "part4": {
+        "type": "object",
+        "properties": {
+          "thirdPartyDesignee": {
+            "type": "object",
+            "properties": {
+              "allowThirdParty": { "type": "boolean" },
+              "designeeName": { "type": "string" },
+              "designeePhone": { "type": "string" },
+              "personalIdentificationNumber": { "type": "string" }
+            }
+          }
+        }
+      },
+      "part5": {
+        "type": "object",
+        "properties": {
+          "signature": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "title": { "type": "string" },
+              "date": { "type": "string", "format": "date" },
+              "phone": { "type": "string" }
+            }
+          },
+          "paidPreparer": {
+            "type": "object",
+            "properties": {
+              "isSelfEmployed": { "type": "boolean" },
+              "name": { "type": "string" },
+              "ptin": { "type": "string" },
+              "signature": { "type": "string" },
+              "date": { "type": "string", "format": "date" },
+              "firmName": { "type": "string" },
+              "firmEIN": { "type": "string" },
+              "address": { "type": "string" },
+              "phone": { "type": "string" },
+              "city": { "type": "string" },
+              "state": { "type": "string" },
+              "zipCode": { "type": "string" }
+            }
+          }
+        }
+      },
+      "paymentVoucher": {
+        "type": "object",
+        "properties": {
+          "ein": { "type": "string" },
+          "amountPaid": { "type": "number" },
+          "taxPeriod": {
+            "type": "string",
+            "enum": ["1st", "2nd", "3rd", "4th"]
+          },
+          "businessName": { "type": "string" },
+          "address": { "type": "string" },
+          "cityStateZip": { "type": "string" }
+        }
+      }
+    },
+    "required": ["employerInfo", "quarter", "part1", "part2", "part5"]
+  }
