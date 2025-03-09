@@ -1,7 +1,7 @@
 import io
 import asyncio
 import json
-from fastapi import FastAPI, UploadFile, File, Body
+from fastapi import FastAPI, UploadFile, File, Body, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -31,117 +31,207 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 # Step 1: Raw extraction prompt remains unchanged.
 RAW_PROMPT = "List every single thing exactly as it appears on the document, each column and row, in full"
 
-# New prompt template to convert extracted text into the structured JSON schema.
-JSON_SCHEMA_PROMPT_TEMPLATE = """
-Format the following extracted text into a JSON object that strictly follows the schema below. Ensure that the output is valid JSON with no additional commentary.
+# Helper function to load a schema file
+def load_schema(schema_id):
+    """
+    Load the specified JSON schema from file
+    
+    Parameters:
+    schema_id (str): Identifier for the schema to load
+    
+    Returns:
+    dict: The loaded schema or None if not found
+    """
+    schema_mapping = {
+        "1040": "1040.json",
+        "2848": "2848.json",
+        "8821": "8821.json",
+        "941": "941.json",
+        "payroll": "payroll.json",
+        "generic": None  # Generic schema doesn't need a specific file
+    }
+    
+    if schema_id not in schema_mapping:
+        return None
+        
+    filename = schema_mapping.get(schema_id)
+    if filename is None:
+        return None
+        
+    try:
+        with open(filename, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading schema {schema_id} from {filename}: {e}")
+        return None
 
-Schema:
-{{
-  "documentMetadata": {{
-    "documentID": "Unique identifier for the document",
-    "documentType": "Type/category (e.g., Invoice, Receipt, BankStatement, MerchantStatement, CreditMemo, PurchaseOrder, etc.)",
-    "documentNumber": "Official reference number from the document",
-    "documentDate": "YYYY-MM-DD (date issued)",
-    "uploadDate": "YYYY-MM-DDTHH:MM:SSZ (date/time uploaded)",
-    "source": {{
-      "name": "Name of the issuer (vendor, bank, customer, etc.)",
-      "type": "Category (Vendor, Customer, Bank, etc.)",
-      "contact": {{
-        "address": "Full address if available",
-        "phone": "Contact phone number",
-        "email": "Contact email address"
-      }}
-    }},
-    "fileInfo": {{
-      "fileName": "Original file name",
-      "fileType": "Format (e.g., PDF, JPEG)",
-      "pageCount": "Number of pages in the document",
-      "OCRProcessed": "Boolean flag indicating whether OCR has been applied"
-    }}
-  }},
-  "financialData": {{
-    "currency": "Currency code (e.g., USD, EUR)",
-    "subtotal": "Amount before any discounts or additional fees",
-    "taxAmount": "Total tax applied (if any) – can be zero or omitted if not applicable",
-    "discount": "Any discounts or adjustments applied",
-    "totalAmount": "Final total monetary value on the document",
-    "paymentStatus": "Status (e.g., Paid, Unpaid, Pending)",
-    "paymentTerms": "Terms such as 'Net 30'",
-    "dueDate": "YYYY-MM-DD (if a due date is specified)"
-  }},
-  "lineItems": [
-    {{
-      "itemID": "Unique identifier for the line item or transaction",
-      "description": "Short description of the product, service, or transaction",
-      "quantity": "Number of units or hours (if invoicing for services)",
-      "unit": "Unit of measure (e.g., hours, pieces, kg, etc.)",
-      "unitPrice": "Price per unit or hourly rate",
-      "totalPrice": "Calculated total for the line item",
-      "tax": "Tax amount applicable to this line item (if any)",
-      "transactionType": "For bank/merchant statements (e.g., Debit, Credit)",
-      "balance": "Running balance after the transaction (if applicable)",
-      "category": "Optional field to classify the line item (e.g., Service, Product)"
-    }}
-  ],
-  "partyInformation": {{
-    "vendor": {{
-      "name": "Vendor/Supplier name",
-      "address": "Vendor address",
-      "contact": "Vendor contact details (phone/email)",
-      "taxID": "Tax identifier if available (optional)"
-    }},
-    "customer": {{
-      "name": "Customer name",
-      "address": "Customer address",
-      "contact": "Customer contact details",
-      "customerID": "Internal customer identifier"
-    }},
-    "bankDetails": {{
-      "bankName": "Name of the bank",
-      "accountNumber": "Bank account number",
-      "routingNumber": "Routing or sort code"
-    }}
-  }},
-  "paymentInformation": {{
-    "paymentMethod": "Method (e.g., Cash, Credit Card, EFT, Direct Deposit)",
-    "transactionID": "Identifier for electronically processed payments",
-    "paidDate": "YYYY-MM-DD (date when payment was made)",
-    "bankDetails": {{
-      "bankName": "If relevant, bank name for the transaction",
-      "accountNumber": "Account number associated with payment",
-      "routingNumber": "Routing number for bank transfers"
-    }}
-  }},
-  "fixedAssetData": {{
-    "assetID": "Unique asset identifier",
-    "description": "Description of the fixed asset or inventory item",
-    "acquisitionDate": "YYYY-MM-DD (date of purchase/acquisition)",
-    "purchasePrice": "Cost of acquiring the asset",
-    "depreciationMethod": "Method used (e.g., Straight-line, Declining Balance)",
-    "currentValue": "Current book value of the asset",
-    "location": "Physical location of the asset (if applicable)"
-  }},
-  "additionalData": {{
-    "notes": "Any annotations or internal comments",
-    "attachments": [
-      "Link(s) or reference(s) to supplementary files, if applicable"
-    ],
-    "referenceNumbers": [
-      "Other relevant reference numbers (e.g., purchase order numbers, shipping numbers)"
-    ],
-    "auditTrail": [
-      {{
-        "action": "Description of the processing step (e.g., 'uploaded', 'OCR extracted')",
-        "timestamp": "YYYY-MM-DDTHH:MM:SSZ",
-        "user": "User or system that performed the action"
-      }}
-    ]
-  }}
-}}
-
-Extracted Text:
-{extracted_text}
-"""
+# Function to generate a schema-specific prompt
+def generate_schema_prompt(schema_id, extracted_text):
+    """
+    Generate a prompt for extraction based on the selected schema
+    
+    Parameters:
+    schema_id (str): Identifier for the schema to use
+    extracted_text (str): Raw text extracted from the document
+    
+    Returns:
+    str: The prompt to use for extraction
+    """
+    # Load the requested schema
+    schema = load_schema(schema_id)
+    
+    # Generic document schema for fallback
+    GENERIC_SCHEMA = """
+    {
+      "documentMetadata": {
+        "documentID": "Unique identifier for the document",
+        "documentType": "Type/category (e.g., Invoice, Receipt, BankStatement, MerchantStatement, CreditMemo, PurchaseOrder, etc.)",
+        "documentNumber": "Official reference number from the document",
+        "documentDate": "YYYY-MM-DD (date issued)",
+        "uploadDate": "YYYY-MM-DDTHH:MM:SSZ (date/time uploaded)",
+        "source": {
+          "name": "Name of the issuer (vendor, bank, customer, etc.)",
+          "type": "Category (Vendor, Customer, Bank, etc.)",
+          "contact": {
+            "address": "Full address if available",
+            "phone": "Contact phone number",
+            "email": "Contact email address"
+          }
+        },
+        "fileInfo": {
+          "fileName": "Original file name",
+          "fileType": "Format (e.g., PDF, JPEG)",
+          "pageCount": "Number of pages in the document",
+          "OCRProcessed": "Boolean flag indicating whether OCR has been applied"
+        }
+      },
+      "financialData": {
+        "currency": "Currency code (e.g., USD, EUR)",
+        "subtotal": "Amount before any discounts or additional fees",
+        "taxAmount": "Total tax applied (if any) – can be zero or omitted if not applicable",
+        "discount": "Any discounts or adjustments applied",
+        "totalAmount": "Final total monetary value on the document",
+        "paymentStatus": "Status (e.g., Paid, Unpaid, Pending)",
+        "paymentTerms": "Terms such as 'Net 30'",
+        "dueDate": "YYYY-MM-DD (if a due date is specified)"
+      },
+      "lineItems": [
+        {
+          "itemID": "Unique identifier for the line item or transaction",
+          "description": "Short description of the product, service, or transaction",
+          "quantity": "Number of units or hours (if invoicing for services)",
+          "unit": "Unit of measure (e.g., hours, pieces, kg, etc.)",
+          "unitPrice": "Price per unit or hourly rate",
+          "totalPrice": "Calculated total for the line item",
+          "tax": "Tax amount applicable to this line item (if any)",
+          "transactionType": "For bank/merchant statements (e.g., Debit, Credit)",
+          "balance": "Running balance after the transaction (if applicable)",
+          "category": "Optional field to classify the line item (e.g., Service, Product)"
+        }
+      ],
+      "partyInformation": {
+        "vendor": {
+          "name": "Vendor/Supplier name",
+          "address": "Vendor address",
+          "contact": "Vendor contact details (phone/email)",
+          "taxID": "Tax identifier if available (optional)"
+        },
+        "customer": {
+          "name": "Customer name",
+          "address": "Customer address",
+          "contact": "Customer contact details",
+          "customerID": "Internal customer identifier"
+        },
+        "bankDetails": {
+          "bankName": "Name of the bank",
+          "accountNumber": "Bank account number",
+          "routingNumber": "Routing or sort code"
+        }
+      },
+      "paymentInformation": {
+        "paymentMethod": "Method (e.g., Cash, Credit Card, EFT, Direct Deposit)",
+        "transactionID": "Identifier for electronically processed payments",
+        "paidDate": "YYYY-MM-DD (date when payment was made)",
+        "bankDetails": {
+          "bankName": "If relevant, bank name for the transaction",
+          "accountNumber": "Account number associated with payment",
+          "routingNumber": "Routing number for bank transfers"
+        }
+      },
+      "fixedAssetData": {
+        "assetID": "Unique asset identifier",
+        "description": "Description of the fixed asset or inventory item",
+        "acquisitionDate": "YYYY-MM-DD (date of purchase/acquisition)",
+        "purchasePrice": "Cost of acquiring the asset",
+        "depreciationMethod": "Method used (e.g., Straight-line, Declining Balance)",
+        "currentValue": "Current book value of the asset",
+        "location": "Physical location of the asset (if applicable)"
+      },
+      "additionalData": {
+        "notes": "Any annotations or internal comments",
+        "attachments": [
+          "Link(s) or reference(s) to supplementary files, if applicable"
+        ],
+        "referenceNumbers": [
+          "Other relevant reference numbers (e.g., purchase order numbers, shipping numbers)"
+        ],
+        "auditTrail": [
+          {
+            "action": "Description of the processing step (e.g., 'uploaded', 'OCR extracted')",
+            "timestamp": "YYYY-MM-DDTHH:MM:SSZ",
+            "user": "User or system that performed the action"
+          }
+        ]
+      }
+    }
+    """
+    
+    # Base prompt template
+    prompt_template = """
+    Format the following extracted text into a JSON object that strictly follows the schema below. Ensure that the output is valid JSON with no additional commentary.
+    
+    Schema:
+    {schema}
+    
+    Extracted Text:
+    {extracted_text}
+    """
+    
+    # If we have a specific schema, use it; otherwise, use the generic one
+    if schema:
+        schema_json = json.dumps(schema, indent=2)
+        
+        # For tax forms, add some specific instructions
+        if schema_id in ["1040", "2848", "8821", "941"]:
+            schema_prompt = f"""
+            Format the following extracted text from an IRS tax form into a JSON object that strictly follows the schema below.
+            This is specifically for IRS Form {schema_id}. Pay special attention to the form fields, numbers, checkboxes, and taxpayer information.
+            
+            Schema:
+            {schema_json}
+            
+            Extracted Text:
+            {extracted_text}
+            """
+        # For payroll data
+        elif schema_id == "payroll":
+            schema_prompt = f"""
+            Format the following extracted text from a payroll document into a JSON object that strictly follows the schema below.
+            This is specifically for payroll data. Pay special attention to employee details, earnings, deductions, and tax information.
+            
+            Schema:
+            {schema_json}
+            
+            Extracted Text:
+            {extracted_text}
+            """
+        else:
+            schema_prompt = prompt_template.format(schema=schema_json, extracted_text=extracted_text)
+    else:
+        # Use the generic schema as fallback
+        schema_prompt = prompt_template.format(schema=GENERIC_SCHEMA, extracted_text=extracted_text)
+    
+    return schema_prompt
 
 def detect_document_type(json_data):
     """
@@ -328,7 +418,7 @@ async def verify_extraction(json_data):
         }
         return json_data
 
-async def process_page(page):
+async def process_page(page, schema="generic"):
     # Write the individual page to a BytesIO stream.
     pdf_writer = PdfWriter()
     pdf_writer.add_page(page)
@@ -354,8 +444,8 @@ async def process_page(page):
     )
     raw_text = raw_response.text
 
-    # Step 2: Convert the raw text into structured JSON using your schema.
-    json_prompt = JSON_SCHEMA_PROMPT_TEMPLATE.format(extracted_text=raw_text)
+    # Step 2: Convert the raw text into structured JSON using the schema-specific prompt
+    json_prompt = generate_schema_prompt(schema, raw_text)
     json_response = await asyncio.to_thread(
         client.models.generate_content,
         model="gemini-2.0-flash",
@@ -406,14 +496,14 @@ def merge_page_results(page_results):
     return merged
 
 @app.post("/process-pdf")
-async def process_file(file: UploadFile = File(...)):
+async def process_file(file: UploadFile = File(...), schema: str = Form("generic")):
     file_content = await file.read()
     
     try:
         if file.content_type == "application/pdf":
             pdf_reader = PdfReader(io.BytesIO(file_content))
             # Process each page concurrently using the per-page processing function.
-            tasks = [process_page(page) for page in pdf_reader.pages]
+            tasks = [process_page(page, schema) for page in pdf_reader.pages]
             page_results = await asyncio.gather(*tasks)
             
             # Merge the JSON results from each page.
@@ -424,7 +514,7 @@ async def process_file(file: UploadFile = File(...)):
             
             combined_response_text = json.dumps(final_result, indent=2)
         else:
-            # For non-PDF files, process as before.
+            # For non-PDF files, process with schema selection
             file_part = types.Part.from_bytes(
                 data=file_content,
                 mime_type=file.content_type
@@ -439,7 +529,10 @@ async def process_file(file: UploadFile = File(...)):
                 }
             )
             raw_text = raw_response.text
-            json_prompt = JSON_SCHEMA_PROMPT_TEMPLATE.format(extracted_text=raw_text)
+            
+            # Use schema-specific prompt template
+            json_prompt = generate_schema_prompt(schema, raw_text)
+            
             json_response = await asyncio.to_thread(
                 client.models.generate_content,
                 model="gemini-2.0-flash",
